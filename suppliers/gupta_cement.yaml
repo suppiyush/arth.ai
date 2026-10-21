@@ -1,0 +1,13 @@
+# Supplier agent config: python -m agents.supplier.agent suppliers/gupta_cement.yaml
+# Prices are rupees per unit (GST inclusive). A counter-offer at or above `floor` is accepted;
+# below it the supplier holds its quote. `stock` caps what it will quote for.
+agent: supplier_gupta           # identity: SEED_SUPPLIER_GUPTA, port from core.net.PORTS
+name: Gupta Cement
+city: Jaipur
+delivery_days: 3
+rating: 4.6
+items:
+  Cement:          {base: 385, floor: 372, stock: 1000}
+  Wall Putty 40kg: {base: 735, floor: 712, stock: 150}
+  White Paint 20L: {base: 3850, floor: 3720, stock: 40}
+  Sand:            {base: 46, floor: 44, stock: 2000}

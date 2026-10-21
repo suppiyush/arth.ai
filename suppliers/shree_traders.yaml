@@ -1,0 +1,16 @@
+# Supplier agent config: python -m agents.supplier.agent suppliers/shree_traders.yaml
+# Prices are rupees per unit (GST inclusive). A counter-offer at or above `floor` is accepted;
+# below it the supplier holds its quote. `stock` caps what it will quote for.
+agent: supplier_shree           # identity: SEED_SUPPLIER_SHREE, port from core.net.PORTS
+name: Shree Traders
+city: Jaipur
+delivery_days: 2
+rating: 4.1
+items:
+  Cement:              {base: 392, floor: 380, stock: 400}
+  TMT Bar 12mm:        {base: 63, floor: 61, stock: 5000}
+  TMT Bar 8mm:         {base: 65, floor: 63, stock: 3000}
+  Binding Wire:        {base: 82, floor: 78, stock: 200}
+  Nails:               {base: 92, floor: 88, stock: 300}
+  PVC Pipe 1 inch:     {base: 245, floor: 236, stock: 400}
+  Electric Wire 1.5mm: {base: 1530, floor: 1480, stock: 60}

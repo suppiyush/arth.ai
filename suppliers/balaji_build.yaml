@@ -1,0 +1,14 @@
+# Supplier agent config: python -m agents.supplier.agent suppliers/balaji_build.yaml
+# Prices are rupees per unit (GST inclusive). A counter-offer at or above `floor` is accepted;
+# below it the supplier holds its quote. `stock` caps what it will quote for.
+agent: supplier_balaji          # identity: SEED_SUPPLIER_BALAJI, port from core.net.PORTS
+name: Balaji Build
+city: Jaipur
+delivery_days: 1
+rating: 3.9
+items:
+  Cement:          {base: 398, floor: 381, stock: 150}
+  Bricks:          {base: 7.2, floor: 6.9, stock: 50000}
+  Sand:            {base: 47, floor: 44.5, stock: 1500}
+  TMT Bar 12mm:    {base: 64, floor: 61.5, stock: 2000}
+  Floor Tiles 2x2: {base: 530, floor: 510, stock: 300}
