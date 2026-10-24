@@ -162,6 +162,7 @@ def test_choose_then_approve(seeded_db, io, suppliers, extracted):
     assert request.accepted_funds[0].amount == "1.905365" and request.accepted_funds[0].currency == "FET"
     assert request.recipient == "fetch1orchestrator" and request.reference == str(po(seeded_db)["id"])
     assert request.metadata["fet_network"] == "stable-testnet"
+    assert request.metadata["content"].endswith("Pay 1.9054 FET to place the order.")
     row = po(seeded_db)
     assert row["status"] == "awaiting_user_payment" and row["unit_price_paise"] == 37730
     assert row["total_paise"] == 1886500 and row["arth_fee_paise"] == 18865 and row["action_id"] is not None

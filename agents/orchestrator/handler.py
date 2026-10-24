@@ -623,11 +623,14 @@ def request_payment(io: IO, sender: str, pending: dict, messages: list[str]) -> 
     set_payment(io.storage, e["po_id"], status="awaiting", owner=sender, business_id=pending["business_id"],
                 action_id=pending["action_id"], atestfet=str(atestfet), title=e["title"], supplier=e["supplier"],
                 item=e["item"], qty=e["qty"], unit=e["unit"], fee_paise=e["fee_paise"], created_at=time.time())
+    description = f"{e['title']}: {inr(e['total_paise'])} + Arth fee {inr(e['fee_paise'])}"
+    # Metadata as in Fetch's ASI:One FET payment example: ASI:One shows "content" on its payment card.
     request = RequestPayment(
         accepted_funds=[Funds(amount=chain.fet_amount(atestfet), currency="FET", payment_method="fet_direct")],
         recipient=chain.address("orchestrator"), deadline_seconds=PAYMENT_DEADLINE, reference=e["po_id"],
-        description=f"{e['title']}: {inr(e['total_paise'])} + Arth fee {inr(e['fee_paise'])}",
-        metadata={"fet_network": chain.NETWORK_NAME, "po_id": e["po_id"]})
+        description=description,
+        metadata={"agent": "Arth", "service": "restock", "fet_network": chain.NETWORK_NAME,
+                  "content": f"{description}. Pay {fet(atestfet)} to place the order.", "po_id": e["po_id"]})
     lang = owner_lang(io.storage, sender)
     lines = [*messages, pick(lang, f"Ab {inr(e['pay_paise'])} = {fet(atestfet)} ka payment approve kijiye "
                                    "(Approve FET Payment). Payment milte hi supplier ko order aur payment chala jayega.",
