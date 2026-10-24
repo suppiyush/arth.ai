@@ -5,8 +5,6 @@
 
 Built for **Fetch-A-Thon 3.0** with Fetch.ai uAgents, ASI1, ASI:One and the Agent Payment Protocol.
 
-> Demo video: *coming soon*
-
 ## The problem
 
 India has millions of small shops (kiranas, hardware and building-material stores) that still run on a paper *khata*.
