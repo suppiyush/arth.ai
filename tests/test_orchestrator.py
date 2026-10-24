@@ -143,7 +143,7 @@ def test_second_sender_gets_own_copy_of_the_demo_shop(seeded_db, io, extracted):
     say("help", io)
     said = texts(say("help", io, sender="agent1qjudge"))
     assert said[0] == "Namaste! Arth is set up for Sharma Building Supplies."
-    assert said[1].startswith("It's a demo shop with 30 days of sample records, just for you.")
+    assert said[1].startswith("It's a demo shop with two months of sample records, just for you.")
     assert "Cement" in extracted["shop"].items and "Kailash Builders" in extracted["shop"].parties
     copy = seeded_db.execute("select * from business where owner_address = 'agent1qjudge'").fetchone()
     assert str(copy["id"]) != config.DEMO_BUSINESS_ID and copy["gstin"] == "08ABCPS1234F1Z5"

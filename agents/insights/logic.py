@@ -207,6 +207,18 @@ def compare(business_id: str, start: date, end: date, label: str, fields: dict) 
     metrics = [(pick(lang, "Bikri", "Sales"), "sales"), ("Gross profit", "gross_profit"),
                (pick(lang, "Kharcha", "Expenses"), "expenses"), ("Net profit", "net_profit"),
                (pick(lang, "Kharid", "Purchases"), "purchases")]
+    first = db.fetch_one(f"select min(t.txn_date) as d from txn t where t.business_id = %s and {LIVE}",
+                         (business_id,))["d"]
+    if first and first > p_start:                  # the older span isn't fully in the books: no percentages
+        rows = [[name, inr(now[k]), inr(before[k]), "—"] for name, k in metrics]
+        since = f"{first:%d %b %Y}"
+        plain = pick(lang, f"{_span(start, end)} mein bikri {inr(now['sales'])}. Pichhle {_span(p_start, p_end)} se "
+                           f"tulna abhi nahi ho sakti: Arth mein hisaab {since} se hai, us period ka poora record nahi hai.",
+                     f"Sales for {_span(start, end)}: {inr(now['sales'])}. I can't compare with {_span(p_start, p_end)} "
+                     f"yet: your books in Arth start on {since}, so that period isn't fully recorded.")
+        return Report(pick(lang, f"{label} vs pehle", f"{label} vs before"),
+                      ["", _span(start, end), _span(p_start, p_end), pick(lang, "Badlav", "Change")], rows, plain,
+                      {"rows": rows, "partial_history_since": since})
     rows = [[name, inr(now[k]), inr(before[k]), _change(now[k], before[k])] for name, k in metrics]
     change = _change(now["sales"], before["sales"])
     if lang == "en":

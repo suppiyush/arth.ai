@@ -269,7 +269,7 @@ def test_report_top_customers(seeded_db, io, extracted, no_asi1):
 def test_report_expenses(seeded_db, io, extracted, no_asi1):
     extracted["result"] = Extraction(intent="question", report="expenses", period="this_year")
     reply = say("kharcha kahan gaya", io)[-1]
-    assert texts([reply])[0].startswith("Is saal kul kharcha ₹32,300. Sabse bada: Rent (₹15,000).")
+    assert texts([reply])[0].startswith("Is saal kul kharcha ₹63,800. Sabse bada: Rent (₹30,000).")
     assert [r[0] for r in body_rows(reply)] == ["Rent", "Salary", "Electricity", "Transport"]
 
 
@@ -278,6 +278,15 @@ def test_report_compare(seeded_db, io, extracted, no_asi1):
     reply = say("pichle mahine se sale badhi ya ghati", io)[-1]
     assert texts([reply])[0].startswith("Bikri ")
     assert [r[0] for r in body_rows(reply)] == ["Bikri", "Gross profit", "Kharcha", "Net profit", "Kharid"]
+    assert "%" in body_rows(reply)[0][-1]                       # 60 days of history: last month is complete
+
+
+def test_compare_says_so_when_the_older_period_is_not_in_the_books(seeded_db, io, extracted, no_asi1):
+    seeded_db.execute("delete from txn where txn_date < shop_today() - 5")    # a shop that started 5 days ago
+    extracted["result"] = Extraction(intent="question", report="compare", period="last_week")
+    reply = say("pichle hafte se sale badhi?", io)[-1]
+    assert "tulna abhi nahi ho sakti" in texts([reply])[0]
+    assert not any("%" in r[-1] for r in body_rows(reply))      # no made-up percentages
 
 
 def test_report_gst(seeded_db, io, extracted, no_asi1):

@@ -62,7 +62,7 @@ arth/
 ├── suppliers/                # shree_traders.yaml, gupta_cement.yaml, balaji_build.yaml
 ├── bridge/whatsapp.py        # P2: FastAPI + Twilio webhook
 ├── db/schema.sql
-├── db/seed.sql               # demo shop: 12 items, 15 parties, 30 days of history
+├── db/seed.sql               # demo shop: 12 items, 15 parties, 60 days of history
 ├── templates/invoice.html
 ├── tests/                    # unit tests + demo_replay.py
 ├── Procfile
@@ -412,7 +412,7 @@ The demo is only as good as its worst run, so every money and tax rule has a uni
 
 - Every external call (ASI1, DB, ledger, agents) is wrapped with one retry and a timeout; the user sees an error card with a next step, never silence (G-8).
 - If ASI1 is down, a regex fallback handles the six demo patterns so the recording can still proceed.
-- Seed data (`db/seed.sql`) gives the demo shop 30 days of history, so Insights has real numbers on the first try.
+- Seed data (`db/seed.sql`) gives the demo shop 60 days of history, so Insights has real numbers on the first try.
 - A `/health` check per agent and a startup log of wallet balances catch an unfunded procurement wallet before the demo.
 
 ## Build order

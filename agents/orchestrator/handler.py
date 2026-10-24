@@ -863,9 +863,9 @@ async def respond(sender: str, msg_id: str, body: str, io: IO) -> list[ChatMessa
     replies = text(pick(lang, f"Namaste! Arth {biz['name']} ke liye taiyaar hai.",
                         f"Namaste! Arth is set up for {biz['name']}.")) if setup else []
     if setup == "copy":
-        replies += text(pick(lang, "Ye ek demo dukaan hai, 30 din ke sample hisaab ke saath, sirf aapke liye. "
+        replies += text(pick(lang, "Ye ek demo dukaan hai, 2 mahine ke sample hisaab ke saath, sirf aapke liye. "
                                    "Jo chahe likhiye: jaise \"Kis kis se paisa lena hai?\"",
-                             "It's a demo shop with 30 days of sample records, just for you. Try anything, "
+                             "It's a demo shop with two months of sample records, just for you. Try anything, "
                              "for example \"Who owes me money?\""))
 
     if sel and sel.get("action") == "example" and sel.get("text"):

@@ -115,7 +115,7 @@ Gupta Cement          supplier          0.00
 Shree Traders         supplier    -22,000.00
 ```
 
-The demo shop is *Sharma Building Supplies*, with 12 items, 15 parties and 30 days of history. Cement starts at 12 bags, below its reorder level of 20.
+The demo shop is *Sharma Building Supplies*, with 12 items, 15 parties and 60 days of history. Cement starts at 12 bags, below its reorder level of 20.
 
 ### Window 2: start the 10 agents (leave it running)
 
@@ -160,7 +160,7 @@ Run these in Window 3, in this order, right after a reset. The expected replies 
 python -m tests.chat_client "help"
 ```
 
-**Expect:** "Namaste! Arth is set up for Sharma Building Supplies." plus five example messages. The first sender takes over the demo shop; any other sender gets a private copy of it, with the extra line "It's a demo shop with 30 days of sample records, just for you."
+**Expect:** "Namaste! Arth is set up for Sharma Building Supplies." plus five example messages. The first sender takes over the demo shop; any other sender gets a private copy of it, with the extra line "It's a demo shop with two months of sample records, just for you."
 
 ### 2. A sale, half paid in cash
 

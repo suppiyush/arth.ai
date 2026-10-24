@@ -88,7 +88,7 @@ Python · uAgents 0.25.5 / uagents-core 0.4.9 (Chat Protocol 0.3.0, Payment Prot
    - `ASI1_API_KEY` from [asi1.ai](https://asi1.ai).
    - `DATABASE_URL`, e.g. `postgresql://postgres:postgres@localhost:55432/postgres`.
    - One unique `SEED_*` per agent, e.g. `python -c "import secrets; print(secrets.token_hex(32))"`. Never commit them.
-4. **Create the demo shop** (Sharma Building Supplies: 12 items, 15 parties, 30 days of history):
+4. **Create the demo shop** (Sharma Building Supplies: 12 items, 15 parties, 60 days of history):
    ```bash
    python -m core.db reset
    ```
@@ -96,7 +96,7 @@ Python · uAgents 0.25.5 / uagents-core 0.4.9 (Chat Protocol 0.3.0, Payment Prot
    ```bash
    honcho start
    ```
-6. **Connect to ASI:One:** open the inspector link from the orchestrator's startup log, choose **Connect → Mailbox**, then chat with the agent in ASI:One. The first person to message it takes over the demo shop; everyone after that (judges included) gets a private copy of it, with the same 30 days of history.
+6. **Connect to ASI:One:** open the inspector link from the orchestrator's startup log, choose **Connect → Mailbox**, then chat with the agent in ASI:One. The first person to message it takes over the demo shop; everyone after that (judges included) gets a private copy of it, with the same 60 days of history.
 7. **Testnet FET for restocks:** fund the procurement wallet (logged at startup) and the paying ASI:One wallet from the Dorado faucet. Rupees convert at `DEMO_INR_PER_FET` (default ₹10,000 = 1 FET).
 
 ## Tests

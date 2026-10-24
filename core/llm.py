@@ -193,6 +193,7 @@ Rules:
   adds anything they can't express (least / lowest / smallest, a threshold like "5000 se zyada", a count
   "kitne", a percentage, an average, a filter on mode, item, place or date range, a comparison of two
   parties), use {"intent": "question", "report": "custom"} instead, so the answer is computed exactly.
+  Exception: the cheapest supplier or the purchase rate of ONE item is report purchases with that item in lines.
 - amount, paid and rate are rupees exactly as the user said them. Do not do arithmetic.
 - "half paid", "aadha diya" -> paid_fraction 0.5. Use paid only for an explicit paid amount.
 - "udhaar", "baad mein dega", "credit" -> mode "credit". "online", "GPay", "PhonePe" -> mode "upi".
@@ -268,6 +269,9 @@ Examples:
 
 "is saal sabse zyada maal kisne liya"
 {"intent": "question", "report": "top_customers", "period": "this_year"}
+
+"cement ka sabse sasta supplier kaun hai"
+{"intent": "question", "report": "purchases", "lines": [{"item": "Cement"}], "period": "this_year"}
 
 "putty ka bhav kya chal raha hai"
 {"intent": "item_info", "lines": [{"item": "Wall Putty 40kg"}]}

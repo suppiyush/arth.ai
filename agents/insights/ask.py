@@ -57,7 +57,9 @@ parties(name, kind, phone, state_code, balance)
 items(name, unit, hsn, gst_rate, cost, price, stock, reorder_level)
   price is the selling price including GST; cost is what the shop pays.
 bills(number, date, party, status, discount_pct, taxable, cgst, sgst, igst, total, paid)
-  GST invoices. status issued | partly_paid | paid | cancelled. Leave out cancelled unless asked.
+  GST invoices the shop issued to its customers. status issued | partly_paid | paid | cancelled. Leave out
+  cancelled unless asked. Purchases from suppliers are never here: they are entries with kind 'purchase'
+  (amount, party = the supplier) and stock_moves with reason 'purchase' (item, qty, party = the supplier).
 bill_lines(bill_number, date, bill_status, item, unit, qty, rate, gst_rate, taxable, tax)
 stock_moves(date, item, unit, qty, reason, party)
   qty < 0 went out, qty > 0 came in. reason sale | purchase | adjust | opening. party is the customer or
@@ -77,6 +79,8 @@ Rules:
 - One SELECT (WITH is fine) over the views above only. No other tables, schemas or system functions.
 - Do all arithmetic in SQL. Round money to 2 decimals and name money columns with the suffix _rs.
 - Name every output column with AS. Put the most relevant row first; at most 20 rows.
+- For "most", "least", "best" or "highest" questions, return the top few rows rather than LIMIT 1, so a tie
+  is visible in the table.
 - The answer sentence may use placeholders only for columns of the FIRST row, and writes no numbers itself.
   A _rs placeholder already shows the ₹ sign, so don't add ₹, Rs or "rupaye" around it.
 - Write "answer" and "cannot" in {language}. Short, natural and grammatical; no emojis.

@@ -1,4 +1,5 @@
--- Demo shop: a building-materials store in Jaipur with 12 items, 15 parties and 30 days of history.
+-- Demo shop: a building-materials store in Jaipur with 12 items, 15 parties and 60 days of history
+-- (party entries in the last 30 days, walk-in sales and running costs over 60, so last month compares).
 -- Run on a freshly created schema (python -m core.db reset). Dates are relative to shop_today(),
 -- and every id is derived from a fixed key, so each run produces the same rows.
 --
@@ -97,7 +98,14 @@ insert into seed_entry values
   ('exp-transport-1', 25, null, 'expense',   50000, 'cash', 'transport',   'tempo'),
   ('exp-transport-2', 17, null, 'expense',   50000, 'cash', 'transport',   'tempo'),
   ('exp-transport-3',  8, null, 'expense',   60000, 'cash', 'transport',   'tempo'),
-  ('exp-transport-4',  3, null, 'expense',   50000, 'cash', 'transport',   'tempo');
+  ('exp-transport-4',  3, null, 'expense',   50000, 'cash', 'transport',   'tempo'),
+  -- the month before
+  ('exp-rent-prev',   50, null, 'expense', 1500000, 'bank', 'rent',        'shop rent'),
+  ('exp-electricity-prev', 40, null, 'expense', 290000, 'upi', 'electricity', null),
+  ('exp-salary-prev', 31, null, 'expense', 1200000, 'cash', 'salary',      'helper salary'),
+  ('exp-transport-5', 54, null, 'expense',   50000, 'cash', 'transport',   'tempo'),
+  ('exp-transport-6', 45, null, 'expense',   60000, 'cash', 'transport',   'tempo'),
+  ('exp-transport-7', 36, null, 'expense',   50000, 'cash', 'transport',   'tempo');
 
 create temp table seed_move (akey text, item text, qty numeric);
 insert into seed_move values
@@ -128,7 +136,7 @@ create temp table seed_walkin as
 select md5('arth-seed-walkin-' || d || '-' || k)::uuid as action_id, d as days_ago, k,
        si.name as item, si.step * (1 + (d * k) % 3) as qty, si.price_paise,
        case when (d + k) % 3 = 0 then 'upi' else 'cash' end as mode
-from generate_series(1, 30) d
+from generate_series(1, 60) d
 cross join generate_series(1, 4) k
 join seed_item si on si.ord = (d * 7 + k * 5) % 12 + 1
 where k <= 2 + d % 3;
@@ -168,7 +176,7 @@ from seed_walkin;
 -- Opening stock is whatever makes the move history add up to today's stock_qty.
 insert into action (id, business_id, kind, payload, created_at)
 values (md5('arth-seed-opening')::uuid, '00000000-0000-4000-8000-000000000001', 'opening_stock',
-        '{"seed": true}', shop_today() - 31 + time '09:00');
+        '{"seed": true}', shop_today() - 61 + time '09:00');
 
 insert into stock_move (action_id, item_id, qty, reason)
 select md5('arth-seed-opening')::uuid, i.id, i.stock_qty - coalesce(sum(m.qty), 0), 'opening'

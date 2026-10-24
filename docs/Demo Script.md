@@ -194,7 +194,7 @@ Footer: "Aapko suppliers ko dena hai: ₹57,400 (Balaji Build, Mahaveer Hardware
 
 **Type:** `Aaj ka hisaab dikhao`
 
-**Expect:** *Day book: Aaj*, "Bikri ₹39,370 · Aaya ₹9,200 · Kharcha ₹800 · Galle mein cash ₹1,21,960", with every entry of the day: the walk-in sale, Ramesh, Piyush, the Verma bill, Sunita's payment, the Balaji delivery and the tempo.
+**Expect:** *Day book: Aaj*, "Bikri ₹39,370 · Aaya ₹9,200 · Kharcha ₹800 · Galle mein cash ₹2,53,200", with every entry of the day: the walk-in sale, Ramesh, Piyush, the Verma bill, Sunita's payment, the Balaji delivery and the tempo.
 
 **Say:** "Wait: the tempo was actually ₹600, not ₹800."
 
@@ -214,13 +214,13 @@ Footer: "Aapko suppliers ko dena hai: ₹57,400 (Balaji Build, Mahaveer Hardware
 
 **Type:** `इस महीने कितना मुनाफा हुआ?`
 
-**Expect:** two or three sentences from ASI1 with a short tip, and a card *Is mahine ka hisaab*: Bikri ≈ ₹2,60,680, Gross profit ≈ ₹36,260, Kharcha ≈ ₹32,400, Net profit *(≈)*, Lena hai / dena hai **₹1,02,820 / ₹57,400**, with buttons **Remind Verma Constructions (₹55,570)** and **Restock Cement**.
+**Expect:** two or three sentences from ASI1 with a short tip, and a card *Is mahine ka hisaab*: Bikri ≈ ₹2,72,690, Gross profit ≈ ₹38,100, Kharcha ≈ ₹32,400, Net profit *(≈)*, Lena hai / dena hai **₹1,02,820 / ₹57,400**, with buttons **Remind Verma Constructions (₹55,570)** and **Restock Cement**.
 
 **Say:** "He asked in Hindi script. Profit uses the real cost of every item sold, and all the figures come from SQL. The model only explains them."
 
 **Type:** `Sabse zyada kya bikta hai?`
 
-**Expect:** best sellers this financial year *(≈)*: TMT Bar 12mm on top by value (1,100 kg, ₹74,800); the most margin from Bricks (₹12,000); a row for each item.
+**Expect:** best sellers this financial year *(≈)*: TMT Bar 12mm on top by value (1,700 kg, ₹1,15,600); the most margin from Bricks (₹18,000); a row for each item.
 
 **Type:** `Who is my best customer?`
 
@@ -235,7 +235,7 @@ Footer: "Aapko suppliers ko dena hai: ₹57,400 (Balaji Build, Mahaveer Hardware
 None of these has its own feature. ASI1 writes a query each time.
 
 **Type:** `Is mahine ka average bill kitna hai?`
-**Expect:** about **77 sales, average bill ≈ ₹3,385** *(≈)*.
+**Expect:** about **81 sales, average bill ≈ ₹3,367** *(≈)*.
 
 **Type:** `Ramesh ne ab tak kitna cement liya hai?`
 **Expect:** **30 bags**: 20 earlier this month and 10 today.

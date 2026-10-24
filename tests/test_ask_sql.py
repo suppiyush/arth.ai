@@ -131,7 +131,7 @@ def test_refused_sql_gets_one_repair_round(seeded_db, monkeypatch):
                      {"sql": "select avg(amount_paise) as a from txn", "answer": "{a}"},
                      {"sql": "select count(*) as n from entries where kind = 'expense'", "answer": "{n} kharche likhe hain."})
     res = asyncio.run(ask.answer("r1", BIZ, "kitne kharche likhe"))
-    assert res.text == "7 kharche likhe hain."
+    assert res.text == "13 kharche likhe hain."
     repair = [m["content"] for m in seen[1] if m["content"].startswith("That did not work")]
     assert len(repair) == 1 and "unknown table 'txn'" in repair[0]
 
@@ -151,7 +151,7 @@ def test_cannot_and_asi1_down(seeded_db, monkeypatch):
 def test_a_number_written_by_the_model_is_not_trusted(seeded_db, monkeypatch):
     fake_asi1(monkeypatch, {"sql": "select count(*) as n from entries where kind = 'expense'",
                             "answer": "Aapke {n} kharche hain, yaani 5000 rupaye."})
-    assert asyncio.run(ask.answer("r1", BIZ, "kitne kharche")).text == "N: 7"
+    assert asyncio.run(ask.answer("r1", BIZ, "kitne kharche")).text == "N: 13"
 
 
 def test_owner_numbers_may_be_repeated_and_double_rupee_signs_go():

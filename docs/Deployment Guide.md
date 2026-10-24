@@ -85,7 +85,7 @@ On [agentverse.ai](https://agentverse.ai) → **Agents** → the Arth orchestrat
 
 ## Before judging: three things to know
 
-1. **Every judge gets their own demo shop.** Your account owns Sharma Building Supplies. Any other ASI:One account that messages Arth gets a private copy of it, with the same 30 days of history, and is told so in its first reply. Judges can try anything without touching your shop or each other's. To give new users an empty shop instead, set `DEMO_COPY_FOR_NEW_USERS=false`.
+1. **Every judge gets their own demo shop.** Your account owns Sharma Building Supplies. Any other ASI:One account that messages Arth gets a private copy of it, with the same 60 days of history, and is told so in its first reply. Judges can try anything without touching your shop or each other's. To give new users an empty shop instead, set `DEMO_COPY_FOR_NEW_USERS=false`.
 2. **ASI1 quota is shared.** Your key allows about 100 ASI1 requests per window (resets 08:30 IST), shared by you and every judge. When it runs out, Arth falls back to keyword rules and many messages get "please try again". A paid or higher-limit ASI1 key avoids this during judging.
 3. **Rotate exposed keys.** The Cloudinary key was pasted in a chat earlier. Before going public, create a new API key in Cloudinary, put it in Railway's `CLOUDINARY_URL`, and delete the old key.
 

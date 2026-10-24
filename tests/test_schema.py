@@ -40,7 +40,7 @@ def test_seed_shape(seeded):
     assert counts == {"item": 12, "party": 15}
     days = seeded.execute(
         "select count(distinct txn_date) as n from txn where kind = 'sale' and party_id is null").fetchone()["n"]
-    assert days == 30
+    assert days == 60
 
 
 def test_seed_stock_moves_add_up(seeded):
