@@ -105,16 +105,16 @@ The demo shop is *Sharma Building Supplies* in Jaipur, with 12 items, 15 custome
 
 | Agent | Role | Address |
 |---|---|---|
-| **Arth** (orchestrator) | The one ASI:One talks to: chat, cards, owner payments | `agent1qvch7u0jna59nw4jkpc8kw3ljjclausz3lrqxn9f8xtuqkryvws9gfsln74` |
-| Arth Ledger | Khata: sales, purchases, expenses, payments, statements, day book | `agent1qgnrg6kx90cgzj2reun4e95aqsa40phjcesag8scm4q8qwt89s0w57v7ktq` |
-| Arth Inventory | Stock moves, oversell checks, low-stock alerts | `agent1qwjlvwtjrfkhpk6e9vaqnyqkwr3q7zh290lnhq3e2lw6drhcg807y9yk4ju` |
-| Arth Billing | GST invoices, numbering and PDFs | `agent1qtqangnsj4fh64wl76ex8sw6j6xj945e382rn7msq6eygx4th6y3umq2gt8` |
-| Arth Collections | Dues, UPI reminders, receipts against invoices | `agent1qg8pl7pwcdwfcnx20wrlymqddy9clp5nfx6sjk6cpqdyspkreqy9cqsysfx` |
-| Arth Procurement | Quotes, negotiation, paying suppliers | `agent1qtjmfuchch0apz8ntw07ld8ymhe56yjylwnw6a8hmypgmhje4scng69cqzs` |
-| Arth Insights | Reports and ask-anything answers from SQL | `agent1qtzvj6f3qk9f25qwzte7rk8n8yazdxs9255u5kar4tuft62hhne5gwz9zq2` |
-| Shree Traders | Supplier agent (independent seller) | `agent1qwyddd9xqchvp5ld5r5jmaczpqds72af9d3sp5hgm5yj2k5fx53g7sn5m4k` |
-| Gupta Cement | Supplier agent (independent seller) | `agent1q0yxyx9nwyc5fvc56zq8l5dcmldmwulrp793f92pk4cxqdtemhex78kthvw` |
-| Balaji Build | Supplier agent (independent seller) | `agent1qvndavra4pkeja24dhxdaj8n6v6qplk79f55gs79d2gusf9yq4yewp4aq5u` |
+| **Arth** (orchestrator) | The one ASI:One talks to: chat, cards, owner payments | `agent1qfw2edq9jy9han0886rjwzea87phw3u74pdxxyzt2u8fc8mcw5aakl9dm73` |
+| Arth Ledger | Khata: sales, purchases, expenses, payments, statements, day book | `agent1qvzwvc9xhjghaycnrv2as620sm2jt2des4dxm6cp32jmh86ptjy82ft7vyj` |
+| Arth Inventory | Stock moves, oversell checks, low-stock alerts | `agent1qf822ktealykua0ygxh2quaqv34rqsdqcwxk5r4q5tu2z6y84dr57m8n002` |
+| Arth Billing | GST invoices, numbering and PDFs | `agent1qws5k9v60rzkkxjte4t7sskchah46et66knw7py8c68x5zlk8fhjk8g84wg` |
+| Arth Collections | Dues, UPI reminders, receipts against invoices | `agent1q25l3r70jttjqcxzcyhhlnh298psxjaa4nkkz2xhnpxmeq9qfcf6zj3h5ek` |
+| Arth Procurement | Quotes, negotiation, paying suppliers | `agent1qtvef83la8y472mgkzw9dwcaa03fd055rw6kumfg0jfvku93w4als6j54v7` |
+| Arth Insights | Reports and ask-anything answers from SQL | `agent1qdajans5hypzpwcnuf7scww4sqk602nhtdzljvcunw48f0ljs088ytem77e` |
+| Shree Traders | Supplier agent (independent seller) | `agent1qdw223f5sepwtc2qg0ht9mngp72qfe6z2y2j430sq79k4wc0ztkfgc4gy93` |
+| Gupta Cement | Supplier agent (independent seller) | `agent1q2uap68ng3g2qazpac88yhv9w9q9e48jhngr7aeucz0jaelhxpe9qv8c2tf` |
+| Balaji Build | Supplier agent (independent seller) | `agent1qt2ypyvw65ndeswjpfx63y72wv7eavn53ef54uj2dzf9dxvqkw29vvh9hrf` |
 
 Addresses come from the seeds in `.env`; new seeds give new addresses.
 
