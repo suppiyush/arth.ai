@@ -12,4 +12,5 @@ COPY . .
 
 # Settings (ASI1_API_KEY, DATABASE_URL, SEED_*, CLOUDINARY_URL, ...) come from the host's environment
 # variables, never from a baked-in .env.
-CMD ["honcho", "start"]
+# First start on an empty database creates the schema and the demo shop; later starts leave data alone.
+CMD ["sh", "-c", "python -m core.db init && exec honcho start"]

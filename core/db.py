@@ -1,6 +1,7 @@
 """Postgres access: one connection pool per process and a transaction helper.
 
     python -m core.db reset    drop everything, apply db/schema.sql and db/seed.sql
+    python -m core.db init     apply schema and seed only if the database is empty (safe on every start)
     python -m core.db check    print row counts and party balances
 """
 
@@ -82,6 +83,18 @@ def reset(url: str) -> None:
         conn.commit()
 
 
+def init(url: str) -> bool:
+    """First start on a new database: create everything. A database that already has Arth's tables is left
+    alone, so this can run before every start of the agents. -> True if it created the schema."""
+    with psycopg.connect(url, autocommit=False) as conn:
+        conn.execute("select pg_advisory_lock(hashtext('arth-init'))")
+        if conn.execute("select to_regclass('business') is not null as ready").fetchone()[0]:
+            return False
+        apply_schema(conn)
+        conn.commit()
+        return True
+
+
 def check(url: str) -> None:
     with psycopg.connect(url, row_factory=dict_row) as conn:
         for table in ("business", "party", "item", "action", "txn", "stock_move"):
@@ -98,6 +111,9 @@ if __name__ == "__main__":
         reset(config.require("DATABASE_URL"))
         print("schema and seed applied")
         check(config.DATABASE_URL)
+    elif command == "init":
+        print("database created with the demo shop" if init(config.require("DATABASE_URL"))
+              else "database already set up; nothing changed")
     elif command == "check":
         check(config.require("DATABASE_URL"))
     else:

@@ -99,6 +99,10 @@ Python · uAgents 0.25.5 / uagents-core 0.4.9 (Chat Protocol 0.3.0, Payment Prot
 6. **Connect to ASI:One:** open the inspector link from the orchestrator's startup log, choose **Connect → Mailbox**, then chat with the agent in ASI:One. The first person to message it takes over the demo shop; everyone after that (judges included) gets a private copy of it, with the same 60 days of history.
 7. **Testnet FET for restocks:** fund the procurement wallet (logged at startup) and the paying ASI:One wallet from the Dorado faucet. Rupees convert at `DEMO_INR_PER_FET` (default ₹10,000 = 1 FET).
 
+## Deploy
+
+One container (`Dockerfile`) runs all ten agents; on first start it creates the database and the demo shop by itself. The orchestrator stays on Agentverse through its Mailbox, so ASI:One reaches it with no public URL. Step-by-step for Railway (with Railway Postgres): [`docs/Deployment Guide.md`](docs/Deployment%20Guide.md).
+
 ## Tests
 
 ```bash
