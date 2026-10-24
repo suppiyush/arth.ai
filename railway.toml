@@ -1,0 +1,8 @@
+# Railway: build the Dockerfile and bring Arth back if it ever stops.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
