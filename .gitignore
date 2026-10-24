@@ -12,3 +12,12 @@ agent*_data.json
 
 # generated invoice PDFs
 invoices/
+
+# working docs kept locally, not published
+docs/Architecture.md
+docs/Architecture.pdf
+docs/Demo Script.md
+docs/Demo Video Script.md
+docs/Deployment Guide.md
+docs/Features.md
+docs/Local Testing.md
