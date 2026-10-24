@@ -58,14 +58,15 @@ def test_two_bad_replies_ask_user(monkeypatch):
     fake_replies(monkeypatch, "no idea", '{"intent": "dance"}')
     with pytest.raises(ExtractionError) as err:
         run(llm.extract("asdf", SHOP))
-    assert "samjha nahi" in err.value.question
+    assert "didn't get that" in err.value.question                       # "asdf" reads as English
 
 
 def test_model_missing_is_recomputed(monkeypatch):
     fake_replies(monkeypatch, '{"intent": "payment_in", "amount": 2000, "missing": ["mode", "date"]}')
     ext = run(llm.extract("2000 mile", SHOP))
     assert ext.missing == ["party"]
-    assert "Kiske naam" in llm.question_for(ext.missing)
+    assert llm.question_for(ext.missing, "hi") == "Kiske naam pe?"
+    assert llm.question_for(ext.missing, "en") == "Which customer or supplier?"
 
 
 def test_shop_names_in_prompt(monkeypatch):
@@ -83,11 +84,29 @@ def test_asi1_down_uses_fallback(monkeypatch):
     assert ext.amount == 4200 and ext.paid_fraction == 0.5 and ext.mode == "cash"
 
 
+def test_earlier_question_goes_to_asi1(monkeypatch):
+    calls = fake_replies(monkeypatch, '{"intent": "payment_in", "party": "Sunita Devi", "amount": 500}')
+    earlier = {"text": "verma ko bil bnao 100 kg sariya", "question": "'sariya' mere stock list mein nahi hai."}
+    ext = run(llm.extract("sunita se 500 aaye gpay pe", SHOP, earlier))
+    prompt = calls[0][1]["content"]
+    assert "Earlier message: verma ko bil bnao 100 kg sariya" in prompt and "New message: sunita se 500" in prompt
+    assert ext.intent == "payment_in" and not ext.follows_up                   # ASI1 decided it stands alone
+
+
+def test_asi1_down_short_reply_continues(monkeypatch):
+    fake_replies(monkeypatch, ConnectionError("down"), ConnectionError("down"))
+    earlier = {"text": "Ramesh ko 10 bag cement becha 4200 mein", "question": "Poora, aadha, ya udhaar?"}
+    ext = run(llm.extract("aadha cash", SHOP, earlier))
+    assert ext.follows_up and ext.intent == "sale" and ext.paid_fraction == 0.5
+    ext = run(llm.extract("Ramesh ka khata dikhao abhi ke abhi please", SHOP, earlier))   # too long to be an answer
+    assert not ext.follows_up and ext.intent == "statement"
+
+
 def test_asi1_down_unknown_message(monkeypatch):
     fake_replies(monkeypatch, ConnectionError("down"))
     with pytest.raises(ExtractionError) as err:
-        run(llm.extract("pichle saal se compare karo", SHOP))
-    assert "try again" in err.value.question
+        run(llm.extract("mausam kaisa hai aaj", SHOP))
+    assert "phir try" in err.value.question                              # Hinglish message, Hinglish reply
 
 
 @pytest.mark.parametrize("text, intent", [
@@ -136,6 +155,14 @@ def test_fallback_bill():
     ext = llm.fallback_extract("Bill bana do Verma Constructions ke liye, 200 kg TMT 12mm", shop)
     assert (ext.intent, ext.party, ext.lines[0].item, ext.lines[0].qty) == ("bill", "Verma Constructions", "TMT Bar 12mm", 200)
     assert llm.fallback_extract("Ramesh ka bill 5 bag cement cash", shop).mode == "cash"
+
+
+def test_fallback_top_dues():
+    assert llm.fallback_extract("Sabse zyada kiska udhar baaki hai?", SHOP).top == 1
+    assert llm.fallback_extract("top 3 dues", SHOP).top == 3
+    assert llm.fallback_extract("kis kis ka udhaar baaki hai?", SHOP).top is None
+    owe = llm.fallback_extract("mujhe sabse zyada kisko dena h", SHOP)
+    assert owe.intent == "dues" and owe.payable and owe.top == 1
 
 
 def test_fallback_discount_needs_a_draft():

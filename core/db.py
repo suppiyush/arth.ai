@@ -50,21 +50,33 @@ def fetch_one(sql: str, params=None) -> dict | None:
         return conn.execute(sql, params).fetchone()
 
 
+def seed_sql(business_id: str | None = None, owner: str = "demo-owner") -> str:
+    """db/seed.sql for one shop. No business_id: the original demo shop. Another id: a copy of it with its own
+    row ids (every seeded id is md5('arth-seed-...'), so a per-shop prefix keeps them apart) and dates
+    relative to today."""
+    sql = SEED_SQL.read_text(encoding="utf-8")
+    if business_id and business_id != config.DEMO_BUSINESS_ID:
+        sql = sql.replace(config.DEMO_BUSINESS_ID, business_id)
+        sql = sql.replace("md5('arth-seed-", f"md5('arth-seed-{business_id}-")
+    return sql.replace("'demo-owner'", "'" + owner.replace("'", "''") + "'")
+
+
 def apply_schema(conn: psycopg.Connection, seed: bool = True) -> None:
     """Run schema.sql (and seed.sql) on a connection whose search_path points at an empty schema."""
     conn.execute(SCHEMA_SQL.read_text(encoding="utf-8"))
     if seed:
-        conn.execute(SEED_SQL.read_text(encoding="utf-8"))
+        conn.execute(seed_sql())
 
 
-TABLES = ("invoice_payment", "reminder", "purchase_order", "invoice_line", "invoice_counter", "invoice", "stock_move", "txn",
-          "action", "item", "party", "business")
+TABLES = ("catalog_change", "invoice_payment", "reminder", "purchase_order", "invoice_line", "invoice_counter", "invoice",
+          "stock_move", "txn", "action", "item", "party", "business")
+VIEWS = ("entries", "parties", "items", "bills", "bill_lines", "stock_moves", "party_balance")
 
 
 def reset(url: str) -> None:
     """Drop only Arth's own objects, so Supabase's grants on the public schema survive."""
     with psycopg.connect(url, autocommit=False) as conn:
-        conn.execute("drop view if exists party_balance")
+        conn.execute(f"drop view if exists {', '.join(VIEWS)}")
         conn.execute(f"drop table if exists {', '.join(TABLES)} cascade")
         apply_schema(conn)
         conn.commit()

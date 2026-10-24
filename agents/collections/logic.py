@@ -11,13 +11,15 @@
 import asyncio
 import base64
 import io
-from datetime import date, timedelta
+import re
+from datetime import timedelta
 from urllib.parse import quote, urlencode
 from uuid import UUID
 
 import qrcode
 
-from core import cards, db, llm, lookup
+from core import cards, clock, db, llm, lookup
+from core.lang import DEFAULT, of, pick, plural
 from core.models import Committed, PlanResult, QueryResult, UndoDone
 from core.money import inr, to_rupees
 
@@ -37,7 +39,7 @@ def oldest_unpaid_days(party_id, due_paise: int) -> int | None:
         remaining -= s["amount_paise"]
         if remaining <= 0:
             break
-    return (date.today() - oldest).days if oldest else None
+    return (clock.today() - oldest).days if oldest else None
 
 
 def dues(business_id: str) -> list[dict]:
@@ -52,27 +54,75 @@ def dues(business_id: str) -> list[dict]:
 def query(request_id: str, business_id: str, intent: str, fields: dict) -> QueryResult:
     if intent != "dues":
         return QueryResult(request_id=request_id, ok=False, text=f"collections cannot answer {intent!r}")
+    lang = of(fields)
     rows = dues(business_id)
     owed = [r for r in rows if r["kind"] == "customer" and r["balance_paise"] > 0]
     payable = [r for r in rows if r["kind"] == "supplier" and r["balance_paise"] < 0]
+    if fields.get("payable"):
+        return payables(request_id, sorted(payable, key=lambda r: r["balance_paise"]), fields.get("top"), lang)
     pay_line = ""
     if payable:
-        pay_line = (f"Aapko suppliers ko dena hai: {inr(-sum(r['balance_paise'] for r in payable))} "
-                    f"({', '.join(r['name'] for r in payable)}).")
+        owe, names = inr(-sum(r["balance_paise"] for r in payable)), ", ".join(r["name"] for r in payable)
+        pay_line = pick(lang, f"Aapko suppliers ko dena hai: {owe} ({names}).", f"You owe suppliers {owe} ({names}).")
     if not owed:
-        return QueryResult(request_id=request_id, ok=True,
-                           text=" ".join(filter(None, ["Kisi customer ka udhaar baaki nahi hai. (No customer owes you money.)", pay_line])))
+        return QueryResult(request_id=request_id, ok=True, text=" ".join(filter(None, [
+            pick(lang, "Kisi customer ka udhaar baaki nahi hai.", "No customer owes you money."), pay_line])))
+    title = pick(lang, "Udhaar list", "Who owes you")
+    if days := fields.get("older_than_days"):    # "15 din se purana udhaar": only dues at least that old
+        owed = [r for r in owed if r["days"] is not None and r["days"] >= days]
+        if not owed:
+            return QueryResult(request_id=request_id, ok=True, text=pick(
+                lang, f"{days} din se purana koi udhaar nahi hai.", f"Nobody has owed you for {days} days or more."))
+        title, pay_line = pick(lang, f"{days}+ din purana udhaar", f"Owed for {days}+ days"), ""
     total = sum(r["balance_paise"] for r in owed)
-    summary = f"Total udhaar {inr(total)}, {len(owed)} customers se."
+    summary = pick(lang, f"Total udhaar {inr(total)}, {plural(len(owed), 'customer')} se.",
+                   f"{plural(len(owed), 'customer')} owe you {inr(total)} in total.")
+    if top := fields.get("top"):              # "sabse zyada kiska udhaar": answer first, then only the top rows
+        first = owed[0]
+        since = pick(lang, f" ({first['days']} din se)", f" (for {first['days']} days)") if first["days"] is not None else ""
+        summary = pick(lang, f"Sabse zyada udhaar {first['name']} ka hai: {inr(first['balance_paise'])}{since}.",
+                       f"{first['name']} owes you the most: {inr(first['balance_paise'])}{since}.") + f" {summary}"
+        title = (pick(lang, "Sabse zyada udhaar", "Owes you the most") if top == 1
+                 else pick(lang, f"Top {min(top, len(owed))} udhaar", f"Top {min(top, len(owed))} dues"))
+        owed, pay_line = owed[:top], ""
+    def since(d: int | None) -> str:
+        if d is None:
+            return "—"
+        if d == 0:
+            return pick(lang, "aaj se", "since today")
+        return pick(lang, f"{d} din se", f"for {d} {'day' if d == 1 else 'days'}")
+
     card = cards.table(
-        "Udhaar list", ["Customer", "Baaki", "Kab se"],
-        [[r["name"], inr(r["balance_paise"]), f"{r['days']} din" if r["days"] is not None else "—"] for r in owed],
+        title, ["Customer", pick(lang, "Baaki", "Owes"), pick(lang, "Kab se", "For")],
+        [[r["name"], inr(r["balance_paise"]), since(r["days"])] for r in owed],
         subtitle=summary,
         row_buttons=[cards.button("Remind", "remind", party_id=str(r["id"]), party=r["name"]) for r in owed],
         footer=[cards.text(pay_line, "muted")] if pay_line else None,
+        detail=lambda r: pick(lang, f"{r[1]} baaki", f"{r[1]} due") + (f" · {r[2]}" if r[2] != "—" else ""),
     )
     return QueryResult(request_id=request_id, ok=True, card_kind=card.kind, card_payload=card.payload,
-                       terminal=card.terminal, text=card.fallback + (f"\n{pay_line}" if pay_line else ""))
+                       terminal=card.terminal, text=card.fallback + (f"\n{pay_line}" if pay_line else ""),
+                       narration=summary)
+
+
+def payables(request_id: str, rows: list[dict], top: int | None, lang: str) -> QueryResult:
+    """What the shop owes suppliers, largest first ("mujhe kisko dena hai")."""
+    if not rows:
+        return QueryResult(request_id=request_id, ok=True,
+                           text=pick(lang, "Aapko kisi supplier ko paise nahi dene hain.", "You don't owe any supplier."))
+    total = inr(-sum(r["balance_paise"] for r in rows))
+    summary = pick(lang, f"Aapko {plural(len(rows), 'supplier')} ko kul {total} dene hain.",
+                   f"You owe {plural(len(rows), 'supplier')} {total} in total.")
+    if top:
+        most = inr(-rows[0]["balance_paise"])
+        summary = pick(lang, f"Sabse zyada {rows[0]['name']} ko dena hai: {most}.",
+                       f"You owe {rows[0]['name']} the most: {most}.") + f" {summary}"
+        rows = rows[:top]
+    card = cards.table(pick(lang, "Aapko dena hai", "You owe"), ["Supplier", pick(lang, "Dena hai", "Amount")],
+                       [[r["name"], inr(-r["balance_paise"])] for r in rows], subtitle=summary,
+                       detail=lambda r: pick(lang, f"{r[1]} dena hai", f"You owe {r[1]}"))
+    return QueryResult(request_id=request_id, ok=True, card_kind=card.kind, card_payload=card.payload,
+                       terminal=card.terminal, text=card.fallback, narration=summary)
 
 
 # Reminders
@@ -106,36 +156,42 @@ def wa_link(phone: str | None, message: str) -> str:
 
 FALLBACK_TEMPLATE = ("Namaste {NAME} ji, {SHOP} se yaad dila rahe hain: aapka {AMOUNT} baaki hai{BILLS}. "
                      "Suvidha ho to yahan se pay kar dijiye: {LINK} Dhanyavaad!")
+FALLBACK_TEMPLATE_EN = ("Hello {NAME}, a gentle reminder from {SHOP}: {AMOUNT} is due{BILLS}. "
+                        "You can pay here: {LINK} Thank you!")
 
 
-async def reminder_template(shop: str, name: str) -> str:
+async def reminder_template(shop: str, name: str, lang: str = DEFAULT) -> str:
     """ASI1 writes the wording only; placeholders are filled by code. Falls back to a fixed template."""
+    fallback = pick(lang, FALLBACK_TEMPLATE, FALLBACK_TEMPLATE_EN)
     try:
         text = await llm.explain(
-            "Write one short, polite WhatsApp payment reminder (under 60 words, Hinglish, warm, not pushy) "
+            "Write one short, polite WhatsApp payment reminder (under 60 words, warm, not pushy) "
             "from a shop to a regular customer. Use these placeholders exactly, each once: {NAME}, {SHOP}, "
             "{AMOUNT}, {BILLS} (may be empty, put it right after the amount), {LINK}. "
             "Write no numbers, amounts or dates yourself. Reply with only the message.",
-            {"shop": shop, "customer": name})
+            {"shop": shop, "customer": name}, lang=lang)
     except Exception:
-        return FALLBACK_TEMPLATE
+        return fallback
     if all(p in text for p in ("{NAME}", "{AMOUNT}", "{LINK}")) and not any(ch.isdigit() for ch in text):
         return text.strip().strip('"')
-    return FALLBACK_TEMPLATE
+    return fallback
 
 
 async def plan(request_id: str, business_id: str, intent: str, fields: dict) -> PlanResult:
     if intent != "reminder":
         return PlanResult(request_id=request_id, ok=False, error=f"collections cannot plan {intent!r}")
 
+    lang = of(fields)
+
     def load():
         if fields.get("party_id"):
             row = db.fetch_one("select id, name, phone, kind from party where id = %s and business_id = %s",
                                (fields["party_id"], business_id))
-            return row, None if row else "Ye customer nahi mila. (I couldn't find that customer.)"
-        res = lookup.find_party(business_id, fields.get("party") or "", "customer")
+            return row, None if row else pick(lang, "Ye customer nahi mila.", "I couldn't find that customer.")
+        res = lookup.find_party(business_id, fields.get("party") or "", "customer", lang)
         if not res.row and not res.question:
-            return None, f"'{fields.get('party')}' naam ka koi customer nahi mila. (I couldn't find that customer.)"
+            return None, pick(lang, f"'{fields.get('party')}' naam ka koi customer nahi mila.",
+                              f"I couldn't find a customer called '{fields.get('party')}'.")
         return res.row, res.question
 
     party, question = await asyncio.to_thread(load)
@@ -144,23 +200,26 @@ async def plan(request_id: str, business_id: str, intent: str, fields: dict) -> 
     due = await asyncio.to_thread(lookup.party_balance, party["id"])
     if due <= 0:
         return PlanResult(request_id=request_id, ok=True,
-                          question=f"{party['name']} ka koi udhaar baaki nahi hai. ({party['name']} owes nothing.)")
+                          question=pick(lang, f"{party['name']} ka koi udhaar baaki nahi hai.", f"{party['name']} owes nothing."))
     biz = await asyncio.to_thread(db.fetch_one, "select name, upi_vpa from business where id = %s", (business_id,))
     bills = [i["number"] for i in await asyncio.to_thread(open_invoices, party["id"])]
 
     link = upi_link(biz["upi_vpa"], biz["name"], due, ", ".join(bills) or "Udhaar") if biz["upi_vpa"] else None
-    template = await reminder_template(biz["name"], party["name"])
+    template = await reminder_template(biz["name"], party["name"], lang)
     message = (template.replace("{NAME}", party["name"]).replace("{SHOP}", biz["name"])
                .replace("{AMOUNT}", inr(due)).replace("{BILLS}", f" (bill {', '.join(bills)})" if bills else "")
                # WhatsApp rarely makes upi:// clickable, so the plain UPI ID goes alongside it
                .replace("{LINK}", f"{link} (UPI ID: {biz['upi_vpa']})" if link else "(UPI ID not set)"))
-    rows = [{"label": "To", "value": f"{party['name']} ({party['phone'] or 'no phone'})"},
-            {"label": "Baaki", "value": inr(due)}]
+    message = re.sub(r" +([.,!?])", r"\1", re.sub(r" {2,}", " ", message))   # an empty {BILLS} leaves gaps
+    phone = f"+91 {party['phone'][2:7]} {party['phone'][7:]}" if party["phone"] and len(party["phone"]) == 12 \
+        else party["phone"] or pick(lang, "phone nahi hai", "no phone")
+    rows = [{"label": "To", "value": f"{party['name']} ({phone})"},
+            {"label": pick(lang, "Baaki", "Due"), "value": inr(due)}]
     if bills:
         rows.append({"label": "Bills", "value": ", ".join(bills)})
     rows.append({"label": "Message", "value": message})
     return PlanResult(request_id=request_id, ok=True, summary_rows=rows, effects={
-        "title": f"Reminder for {party['name']}", "party_id": str(party["id"]), "party": party["name"],
+        "title": pick(lang, f"{party['name']} ko reminder", f"Reminder for {party['name']}"), "party_id": str(party["id"]), "party": party["name"],
         "amount_paise": due, "message": message, "upi_link": link, "wa_link": wa_link(party["phone"], message),
         "qr": qr_data_uri(link) if link else None})
 
@@ -208,7 +267,7 @@ def _apply_receipts(cur, action_id: str) -> list[str]:
     return notes
 
 
-def _follow_up(cur, action_id: str) -> list[str]:
+def _follow_up(cur, action_id: str, lang: str) -> list[str]:
     """After a credit sale or bill, schedule a follow-up for customers who still owe."""
     notes = []
     sold_to = cur.execute("select distinct t.party_id, p.name from txn t join party p on p.id = t.party_id "
@@ -217,22 +276,30 @@ def _follow_up(cur, action_id: str) -> list[str]:
         due = cur.execute("select balance_paise from party_balance where id = %s", (p["party_id"],)).fetchone()
         if not due or due["balance_paise"] <= 0:
             continue
-        when = date.today() + timedelta(days=FOLLOW_UP_DAYS)
+        when = clock.today() + timedelta(days=FOLLOW_UP_DAYS)
         if not cur.execute("select 1 from reminder where action_id = %s and party_id = %s",
                            (action_id, p["party_id"])).fetchone():
             cur.execute("insert into reminder (action_id, party_id, amount_paise, follow_up) values (%s, %s, %s, %s)",
                         (action_id, p["party_id"], due["balance_paise"], when))
-        notes.append(f"{p['name']} ko {when:%d %b} ko yaad dilaunga.")
+        notes.append(pick(lang, f"{p['name']} ko {when:%d %b} ko yaad dilaunga.",
+                          f"I'll remind you about {p['name']} on {when:%d %b}."))
     return notes
 
 
-def commit(request_id: str, action_id: str, business_id: str, effects: dict) -> Committed:
+def commit(request_id: str, action_id: str, business_id: str, effects: dict, lang: str = DEFAULT) -> Committed:
     action_id = str(UUID(action_id))
     with db.transaction() as cur:
         cur.execute("select pg_advisory_xact_lock(hashtext(%s))", ("collections:" + action_id,))
+        if link := effects.get("link_receipts"):  # a bill made later for a sale: what was paid then counts towards it
+            paid = cur.execute("select coalesce(sum(amount_paise), 0) as s from txn where action_id = %s and kind = 'receipt'",
+                               (link["sale_action_id"],)).fetchone()["s"]
+            if paid:
+                cur.execute("insert into invoice_payment (action_id, invoice_id, amount_paise) values (%s, %s, %s) "
+                            "on conflict do nothing", (link["sale_action_id"], link["invoice_id"], paid))
+            return Committed(request_id=request_id, ok=True, message="")
         if effects.get("after_money"):
             bills = _apply_receipts(cur, action_id)
-            notes = _follow_up(cur, action_id)
+            notes = _follow_up(cur, action_id, lang)
             if bills:
                 notes.insert(0, "Bill status: " + ", ".join(bills) + ".")
             return Committed(request_id=request_id, ok=True, message=" ".join(notes))
@@ -242,13 +309,14 @@ def commit(request_id: str, action_id: str, business_id: str, effects: dict) -> 
                         "values (%s, %s, %s, %s, %s, now())",
                         (action_id, effects["party_id"], effects["amount_paise"], effects["message"],
                          effects["upi_link"]))
-    lines = [f"WhatsApp pe bhejne ke liye kholiye: {effects['wa_link']}"]
+    lines = [pick(lang, f"WhatsApp pe bhejne ke liye kholiye: {effects['wa_link']}",
+                  f"Open this to send it on WhatsApp: {effects['wa_link']}")]
     if effects["upi_link"]:
         lines.append(f"UPI link: {effects['upi_link']}")
     return Committed(request_id=request_id, ok=True, message="\n".join(lines))
 
 
-def undo(action_id: str) -> UndoDone:
+def undo(action_id: str, lang: str = DEFAULT) -> UndoDone:
     """The action is already marked undone, so its invoice_payment rows no longer count: re-derive the
     status of the invoices they touched, and drop the action's reminders and follow-ups."""
     action_id = str(UUID(action_id))
@@ -265,6 +333,7 @@ def undo(action_id: str) -> UndoDone:
                 where i.id = %s and i.status <> 'cancelled' returning i.number, i.status""",
                 (r["invoice_id"], r["invoice_id"])).fetchone()
             if row:
-                notes.append(f"{row['number']} ab {row['status'].replace('_', ' ')}.")
+                notes.append(pick(lang, f"{row['number']} ab {row['status'].replace('_', ' ')}.",
+                                  f"{row['number']} is now {row['status'].replace('_', ' ')}."))
         cur.execute("delete from reminder where action_id = %s", (action_id,))
     return UndoDone(action_id=action_id, ok=True, message=" ".join(notes))

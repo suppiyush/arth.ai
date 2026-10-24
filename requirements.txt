@@ -10,6 +10,8 @@ cosmpy
 qrcode[pil]>=7,<8
 jinja2>=3.1
 pyyaml>=6
+sqlglot>=30,<31              # checks ASI1-written SQL before it runs (agents/insights/ask.py)
 honcho>=2
 pytest>=8,<9
-# P1 invoice PDFs; needs system Pango libraries, install on the VM: weasyprint>=62,<63
+fpdf2>=2.8,<2.9                # invoice PDFs (pure Python, no system libraries)
+cloudinary>=1.46,<2            # invoice PDF hosting, so ASI:One gets a link

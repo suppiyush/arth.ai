@@ -20,7 +20,7 @@ def test_qr_is_small_png():
 
 
 def fake_explain(reply):
-    async def explain(instruction, data, temperature=0.3):
+    async def explain(instruction, data, temperature=0.3, lang="en"):
         if isinstance(reply, Exception):
             raise reply
         return reply
@@ -30,7 +30,7 @@ def fake_explain(reply):
 def test_template_from_asi1_is_used(monkeypatch):
     good = "Namaste {NAME} ji! {SHOP} se: {AMOUNT} baaki{BILLS}. Pay here: {LINK}"
     monkeypatch.setattr(logic.llm, "explain", fake_explain(good))
-    assert asyncio.run(logic.reminder_template("Shop", "Ramesh")) == good
+    assert asyncio.run(logic.reminder_template("Shop", "Ramesh", "hi")) == good
 
 
 def test_bad_templates_fall_back(monkeypatch):
@@ -38,4 +38,5 @@ def test_bad_templates_fall_back(monkeypatch):
                   "Namaste {NAME}, please pay.",                       # placeholders missing
                   ConnectionError()):                                  # ASI1 down
         monkeypatch.setattr(logic.llm, "explain", fake_explain(reply))
-        assert asyncio.run(logic.reminder_template("Shop", "R")) == logic.FALLBACK_TEMPLATE
+        assert asyncio.run(logic.reminder_template("Shop", "R", "hi")) == logic.FALLBACK_TEMPLATE
+        assert asyncio.run(logic.reminder_template("Shop", "R", "en")) == logic.FALLBACK_TEMPLATE_EN

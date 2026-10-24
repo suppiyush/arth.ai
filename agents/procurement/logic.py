@@ -16,15 +16,16 @@ Supplier agents are reached through a SupplierIO, so tests can run the suppliers
 
 import asyncio
 import math
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Protocol
 
 from uagents import Model
 from uagents_core.contrib.protocols.payment import CancelPayment, CommitPayment, CompletePayment, RequestPayment
 
 from agents.supplier import logic as supplier_logic
-from core import cards, chain, config, db, lookup, net
+from core import cards, chain, clock, config, db, lookup, net
 from core.fuzzy import best_match
+from core.lang import DEFAULT, of, pick
 from core.models import RFQ, Committed, Counter, OrderConfirmed, OrderResult, PlaceOrder, PlanResult, Quote, UndoDone
 from core.money import fet, inr, paise_to_atestfet, percent_of, qty as fmt_qty
 
@@ -80,7 +81,7 @@ def rank_key(q: dict):
 async def negotiate(suppliers: SupplierIO, po_id: str, item: str, amount: float,
                     parties: list[dict]) -> tuple[list[dict], list[str], list[str]]:
     """Returns (quotes cheapest first, names that didn't reply, names that don't stock it)."""
-    rfq = RFQ(po_id=po_id, item=item, qty=amount, need_by=(date.today() + timedelta(days=NEED_BY_DAYS)).isoformat())
+    rfq = RFQ(po_id=po_id, item=item, qty=amount, need_by=(clock.today() + timedelta(days=NEED_BY_DAYS)).isoformat())
     replies = await collect(suppliers, parties, [rfq] * len(parties), QUOTE_WAIT)
     quotes, silent, unstocked = [], [], []
     for p, q in zip(parties, replies):
@@ -119,7 +120,7 @@ def suggested_qty(item: dict) -> float:
 
 
 def quotes_card(request_id: str, item: dict, amount: float, quotes: list[dict], silent: list[str],
-                unstocked: list[str]) -> cards.Card:
+                unstocked: list[str], lang: str = DEFAULT) -> cards.Card:
     unit = item["unit"]
     fastest = min(q["delivery_days"] for q in quotes)
     top_rating = max(q["rating"] for q in quotes)
@@ -134,20 +135,23 @@ def quotes_card(request_id: str, item: dict, amount: float, quotes: list[dict], 
             badges.append(cards.badge_("Top rated", "info"))
         secondary = f"Total {inr(order_total(q['unit_price_paise'], amount))}"
         if q["unit_price_paise"] < q["first_price_paise"]:
-            secondary += f" · mol-bhav: {inr(q['first_price_paise'])} → {inr(q['unit_price_paise'])}"
+            secondary += pick(lang, " · mol-bhav: ", " · negotiated: ") + f"{inr(q['first_price_paise'])} → {inr(q['unit_price_paise'])}"
         elif q["countered"]:
-            secondary += " · counter-offer nahi maana"
+            secondary += pick(lang, " · counter-offer nahi maana", " · declined our counter-offer")
+        days = pick(lang, f"{q['delivery_days']} din", f"{q['delivery_days']} {'day' if q['delivery_days'] == 1 else 'days'}")
         entries.append(cards.carousel_item(
             q["supplier"], q["supplier"],
-            f"{inr(q['unit_price_paise'])}/{unit} · {q['delivery_days']} din · ★{q['rating']:g}",
+            f"{inr(q['unit_price_paise'])}/{unit} · {days} · ★{q['rating']:g}",
             cards.cta("Choose", "choose_supplier", request_id, primary=n == 0, supplier=q["supplier"]),
             secondary_text=secondary, badges=badges))
-    notes = [f"{len(quotes)} quotes, 1 round of counter-offers", f"Arth fee {config.ARTH_FEE_PCT:g}% at approval"]
+    notes = [pick(lang, f"{len(quotes)} quote, ek round mol-bhav", f"{len(quotes)} quotes, 1 round of counter-offers"),
+             pick(lang, f"Arth fee {config.ARTH_FEE_PCT:g}% approve karne par", f"Arth fee {config.ARTH_FEE_PCT:g}% at approval")]
     if silent:
-        notes.append(f"no reply: {', '.join(silent)}")
+        notes.append(pick(lang, f"jawab nahi aaya: {', '.join(silent)}", f"no reply: {', '.join(silent)}"))
     if unstocked:
-        notes.append(f"don't stock it: {', '.join(unstocked)}")
-    return cards.carousel(f"Quotes for {fmt_qty(amount, unit)} {item['name']}", entries, " · ".join(notes))
+        notes.append(pick(lang, f"inke paas nahi hai: {', '.join(unstocked)}", f"don't stock it: {', '.join(unstocked)}"))
+    title = pick(lang, f"{fmt_qty(amount, unit)} {item['name']} ke quote", f"Quotes for {fmt_qty(amount, unit)} {item['name']}")
+    return cards.carousel(title, entries, " · ".join(notes))
 
 
 def create_po(business_id: str, item_id, amount: float) -> str:
@@ -165,10 +169,11 @@ def set_po(po_id: str, **cols) -> None:
 
 
 async def plan_restock(request_id: str, business_id: str, fields: dict, suppliers: SupplierIO) -> PlanResult:
-    lines = fields.get("lines") or []
+    lines, lang = fields.get("lines") or [], of(fields)
     if not lines:
-        return PlanResult(request_id=request_id, ok=True, question="Kaunsa saamaan mangwana hai? (Which item to restock?)")
-    found = await asyncio.to_thread(lookup.find_item, business_id, lines[0]["item"])
+        return PlanResult(request_id=request_id, ok=True,
+                          question=pick(lang, "Kaunsa saamaan mangwana hai?", "Which item should I restock?"))
+    found = await asyncio.to_thread(lookup.find_item, business_id, lines[0]["item"], lang)
     if found.question:
         return PlanResult(request_id=request_id, ok=True, question=found.question)
     item = found.row
@@ -176,17 +181,20 @@ async def plan_restock(request_id: str, business_id: str, fields: dict, supplier
     await asyncio.to_thread(link_suppliers, business_id)
     parties = await asyncio.to_thread(linked_suppliers, business_id)
     if not parties:
-        return PlanResult(request_id=request_id, ok=False, error="koi supplier agent juda nahi hai (no supplier agents linked)")
+        return PlanResult(request_id=request_id, ok=False,
+                          error=pick(lang, "koi supplier agent juda nahi hai", "no supplier agents are linked"))
 
     po_id = await asyncio.to_thread(create_po, business_id, item["id"], amount)
     quotes, silent, unstocked = await negotiate(suppliers, po_id, item["name"], amount, parties)
     if not quotes:
         await asyncio.to_thread(set_po, po_id, status="failed", quotes=[])
-        why = "kisi supplier ne jawab nahi diya" if not unstocked else f"{', '.join(unstocked)} ke paas nahi hai"
-        return PlanResult(request_id=request_id, ok=False, error=f"{item['name']} ka quote nahi mila: {why}")
+        why = (pick(lang, "kisi supplier ne jawab nahi diya", "no supplier replied") if not unstocked
+               else pick(lang, f"{', '.join(unstocked)} ke paas nahi hai", f"{', '.join(unstocked)} don't stock it"))
+        return PlanResult(request_id=request_id, ok=False,
+                          error=pick(lang, f"{item['name']} ka quote nahi mila: {why}", f"no quote for {item['name']}: {why}"))
     await asyncio.to_thread(set_po, po_id, status="awaiting_approval", quotes=quotes)
 
-    card = quotes_card(request_id, item, amount, quotes, silent, unstocked)
+    card = quotes_card(request_id, item, amount, quotes, silent, unstocked, lang)
     rows = [{"label": "Item", "value": f"{fmt_qty(amount, item['unit'])} {item['name']}"},
             {"label": "Best quote", "value": f"{quotes[0]['supplier']} @ {inr(quotes[0]['unit_price_paise'])}"}]
     if not lines[0].get("qty"):
@@ -204,14 +212,17 @@ def load_po(po_id: str, business_id: str) -> dict | None:
 
 
 def plan_choice(request_id: str, business_id: str, fields: dict) -> PlanResult:
+    lang = of(fields)
     po = load_po(fields["po_id"], business_id)
     if not po or po["status"] != "awaiting_approval":
-        return PlanResult(request_id=request_id, ok=False, error="ye order ab khula nahi hai (this order is no longer open)")
+        return PlanResult(request_id=request_id, ok=False,
+                          error=pick(lang, "ye order ab khula nahi hai", "this order is no longer open"))
     quotes = po["quotes"] or []
     name = best_match(fields.get("supplier") or "", [q["supplier"] for q in quotes]).name
     if not name:
         return PlanResult(request_id=request_id, ok=True,
-                          question=f"Kaunsa supplier? {' / '.join(q['supplier'] for q in quotes)} (Which supplier?)")
+                          question=pick(lang, f"Kaunsa supplier? {' / '.join(q['supplier'] for q in quotes)}",
+                                        f"Which supplier: {' / '.join(q['supplier'] for q in quotes)}?"))
     q = next(q for q in quotes if q["supplier"] == name)
     amount = float(po["qty"])
     total = order_total(q["unit_price_paise"], amount)
@@ -220,16 +231,18 @@ def plan_choice(request_id: str, business_id: str, fields: dict) -> PlanResult:
     atestfet = paise_to_atestfet(pay)
     rate = inr(q["unit_price_paise"])
     if q["unit_price_paise"] < q["first_price_paise"]:
-        rate += f" (pehle {inr(q['first_price_paise'])})"
-    title = f"Restock: {fmt_qty(amount, po['unit'])} {po['item_name']} from {name}"
+        rate += pick(lang, f" (pehle {inr(q['first_price_paise'])})", f" (was {inr(q['first_price_paise'])})")
+    title = pick(lang, f"Restock: {name} se {fmt_qty(amount, po['unit'])} {po['item_name']}",
+                 f"Restock: {fmt_qty(amount, po['unit'])} {po['item_name']} from {name}")
     rows = [
         {"label": "Supplier", "value": f"{name} · ★{q['rating']:g}"},
         {"label": "Item", "value": f"{fmt_qty(amount, po['unit'])} {po['item_name']}"},
         {"label": "Rate", "value": f"{rate}/{po['unit']}"},
         {"label": "Order total", "value": inr(total)},
         {"label": f"Arth fee ({config.ARTH_FEE_PCT:g}%)", "value": inr(fee)},
-        {"label": "You pay", "value": f"{inr(pay)} = {fet(atestfet)} (testnet)"},
-        {"label": "Delivery", "value": f"{q['delivery_days']} din mein"},
+        {"label": pick(lang, "Aap denge", "You pay"), "value": f"{inr(pay)} = {fet(atestfet)} (testnet)"},
+        {"label": "Delivery", "value": pick(lang, f"{q['delivery_days']} din mein",
+                                            f"in {q['delivery_days']} {'day' if q['delivery_days'] == 1 else 'days'}")},
     ]
     return PlanResult(request_id=request_id, ok=True, summary_rows=rows, effects={
         "po_id": str(po["id"]), "supplier_id": q["party_id"], "supplier": name, "unit_price_paise": q["unit_price_paise"],
@@ -246,7 +259,7 @@ async def plan(request_id: str, business_id: str, intent: str, fields: dict, sup
     return PlanResult(request_id=request_id, ok=False, error=f"procurement cannot plan {intent!r}")
 
 
-def commit(request_id: str, action_id: str, business_id: str, effects: dict) -> Committed:
+def commit(request_id: str, action_id: str, business_id: str, effects: dict, lang: str = DEFAULT) -> Committed:
     with db.transaction() as cur:
         if effects.get("cancel"):
             cur.execute("update purchase_order set status = 'cancelled' where id = %s and business_id = %s "
@@ -263,19 +276,22 @@ def commit(request_id: str, action_id: str, business_id: str, effects: dict) -> 
                     "arth_fee_paise = %s, status = 'awaiting_user_payment' where id = %s",
                     (action_id, effects["supplier_id"], effects["unit_price_paise"], effects["total_paise"],
                      effects["fee_paise"], effects["po_id"]))
-    return Committed(request_id=request_id, ok=True, message=(
-        f"Order {effects['supplier']} ke saath tay: {inr(effects['unit_price_paise'])} rate, "
+    return Committed(request_id=request_id, ok=True, message=pick(
+        lang, f"Order {effects['supplier']} ke saath tay: {inr(effects['unit_price_paise'])} rate, "
+              f"total {inr(effects['total_paise'])}.",
+        f"Order agreed with {effects['supplier']}: {inr(effects['unit_price_paise'])} rate, "
         f"total {inr(effects['total_paise'])}."))
 
 
-def undo(action_id: str) -> UndoDone:
+def undo(action_id: str, lang: str = DEFAULT) -> UndoDone:
     with db.transaction() as cur:
         po = cur.execute("select status from purchase_order where action_id = %s", (action_id,)).fetchone()
         if not po:
             return UndoDone(action_id=action_id, ok=True)
         if po["status"] in ("awaiting_user_payment", "awaiting_approval", "cancelled"):
             cur.execute("update purchase_order set status = 'cancelled' where action_id = %s", (action_id,))
-            return UndoDone(action_id=action_id, ok=True, message="Supplier order cancel ho gaya.")
+            return UndoDone(action_id=action_id, ok=True,
+                            message=pick(lang, "Supplier order cancel ho gaya.", "Supplier order cancelled."))
     return UndoDone(action_id=action_id, ok=False,
                     message=f"Order is already {po['status']}; paid orders can't be undone here.")
 

@@ -50,3 +50,11 @@ def seeded_db(seeded):
     finally:
         db._pool = saved
         test_pool.close()
+
+
+@pytest.fixture(autouse=True)
+def no_uploads(monkeypatch, tmp_path):
+    """Tests never upload invoice PDFs to Cloudinary (even with CLOUDINARY_URL in .env) or write into the repo."""
+    from core import storage
+    monkeypatch.setattr(config, "CLOUDINARY_URL", "")
+    monkeypatch.setattr(storage, "LOCAL_DIR", tmp_path / "invoices")

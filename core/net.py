@@ -5,6 +5,8 @@ every other address (ASI:One users, supplier agents elsewhere) is resolved throu
 Only the orchestrator needs a mailbox.
 """
 
+import logging
+
 from uagents import Agent
 from uagents.crypto import Identity
 from uagents.resolver import GlobalResolver, Resolver
@@ -17,7 +19,8 @@ PORTS = {
 }
 
 ASK_TIMEOUT = 10        # seconds per specialist reply (G-9)
-ASK_TIMEOUTS = {"procurement": 20}      # a restock plan waits on supplier quotes and a counter round
+ASK_TIMEOUTS = {"procurement": 20,      # a restock plan waits on supplier quotes and a counter round
+                "billing": 25}          # an invoice PDF is drawn and uploaded to Cloudinary
 
 
 def timeout_for(name: str) -> int:
@@ -51,8 +54,21 @@ def _has_seed(name: str) -> bool:
         return False
 
 
+def show_arth_logs() -> None:
+    """Print Arth's own loggers (arth.*) at INFO, e.g. what each chat message was understood as and when
+    ASI1 fell back to the offline rules. Without a handler only warnings would reach the console."""
+    log = logging.getLogger("arth")
+    if not log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     [%(name)s]: %(message)s"))
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+        log.propagate = False
+
+
 def make_agent(name: str, display_name: str, mailbox: bool = False, **kwargs) -> Agent:
     """Specialists get a local HTTP endpoint; the orchestrator gets a mailbox for ASI:One."""
+    show_arth_logs()
     return Agent(
         name=display_name,
         seed=config.seed(name),

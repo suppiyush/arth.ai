@@ -1,8 +1,8 @@
-"""The 40-message extraction set: real-sounding shop messages in English, Hindi and Hinglish (with
+"""The 62-message extraction set: real-sounding shop messages in English, Hindi and Hinglish (with
 typos and local words), each with the fields ASI1 must get right. A case passes only on an exact
 match of every listed field; fields not listed aren't checked.
 
-    python -m tests.extraction_eval          # run against ASI1 and print a report (40 requests)
+    python -m tests.extraction_eval          # run against ASI1 and print a report (62 requests)
 
 tests/test_extraction_live.py runs the same set under pytest and requires >= 90%. Failures feed the
 prompt examples in core/llm.py; the messages here must not copy those examples.
@@ -85,7 +85,30 @@ CASES = [
     # dues
     Case("kis kis ka udhaar baaki hai", dict(intent="dues")),
     Case("who owes me money?", dict(intent="dues")),
-    Case("Verma ko payment reminder bhejo", dict(intent="dues", party="Verma Constructions")),
+    Case("Verma ko payment reminder bhejo", dict(intent="remind", party="Verma Constructions")),
+    Case("Who do I owe maximum amount?", dict(intent="dues", payable=True, top=1)),
+    Case("Who do I owe the least amount to?", dict(intent="question", report="custom"), note="twist on a fixed intent"),
+    Case("how many customers owe me more than 2000", dict(intent="question", report="custom"),
+         note="threshold and count"),
+    Case("Kis kis se paisa lena hai?", dict(intent="dues", payable=False)),
+    Case("मुझे किस किस को पैसे देने हैं?", dict(intent="dues", payable=True), note="Hindi"),
+    Case("20 din se purana udhaar kiska hai", dict(intent="dues", older_than_days=20)),
+    Case("Ramesh se kitna lena hai?", dict(intent="statement", party="Ramesh Kumar")),
+    Case("how much do I owe gupta cement", dict(intent="statement", party="Gupta Cement")),
+    # items
+    Case("TMT 8mm ka rate batao", dict(intent="item_info", lines=[("TMT Bar 8mm", None)])),
+    Case("dukan mein kul kitne ka stock hai", dict(intent="item_info", lines=[])),
+    Case("5 bag putty mein seelan aa gayi, phekna padega",
+         dict(intent="stock_adjust", adjust="out", lines=[("Wall Putty 40kg", 5)]), note="damaged"),
+    Case("count kiya to bricks 5800 hi hain", dict(intent="stock_adjust", adjust="set", lines=[("Bricks", 5800)])),
+    Case("sand ka rate 60 kar do", dict(intent="set_item", lines=[("Sand", None)])),
+    Case("Rajesh Hardware ko supplier mein add karo, phone 9414099999",
+         dict(intent="set_party", party="Rajesh Hardware", party_kind="supplier")),
+    # bills already made
+    Case("pichla bill dikhao", dict(intent="invoices", top=1)),
+    Case("bill no 2 dikhana zara", dict(intent="invoices", invoice="2")),
+    Case("verma ke kaunse bill baaki hain", dict(intent="invoices", party="Verma Constructions", unpaid=True)),
+    Case("ARTH/26-27/0004 cancel kar do", dict(intent="cancel_bill")),
     # restock
     Case("50 bag cement order karo", dict(intent="restock", lines=[("Cement", 50)])),
     Case("cement khatam hone wala hai, mangwa do", dict(intent="restock", lines=[("Cement", None)])),
@@ -99,7 +122,11 @@ CASES = [
     # question
     Case("is mahine kitni sale hui", dict(intent="question", period="this_month")),
     Case("pichhle mahine ka profit kitna tha", dict(intent="question", period="last_month")),
-    Case("which item sells the most?", dict(intent="question")),
+    Case("which item sells the most?", dict(intent="question", report="top_items")),
+    Case("mera sabse bada grahak kaun hai", dict(intent="question", report="top_customers")),
+    Case("is mahine paisa kahan kahan kharch hua", dict(intent="question", report="expenses", period="this_month")),
+    Case("last month ke comparison mein is month kaisa raha", dict(intent="question", report="compare")),
+    Case("is mahine ka GST kitna banega", dict(intent="question", report="gst", period="this_month")),
     # undo, help
     Case("galti ho gayi, last entry hata do", dict(intent="undo")),
     Case("what can you do?", dict(intent="help")),

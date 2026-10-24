@@ -35,6 +35,12 @@ DEMO_BUSINESS_ID = "00000000-0000-4000-8000-000000000001"   # created by db/seed
 PRICES_INCLUDE_GST = _bool("PRICES_INCLUDE_GST", True)   # catalogue and spoken rates already contain GST
 AGENT_HOST =os.getenv("AGENT_HOST", "127.0.0.1")   # where Arth's own agents reach each other
 CLAIM_DEMO_SHOP =_bool("CLAIM_DEMO_SHOP", True)   # first ASI:One sender takes over the seeded shop
+# Every later new sender gets a private copy of the demo shop (same story, own ids); off = an empty shop.
+DEMO_COPY_FOR_NEW_USERS = _bool("DEMO_COPY_FOR_NEW_USERS", True)
+# Text sent alongside a card: "short" = one line (ASI:One draws the card itself), "full" = the whole card as
+# text too, for chat clients that don't show cards.
+CARD_TEXT = os.getenv("CARD_TEXT", "short").strip().lower()
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()   # cloudinary://key:secret@cloud; invoice PDFs get a public link
 
 
 def seed(agent: str) -> str:

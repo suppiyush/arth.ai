@@ -1,0 +1,11 @@
+.env
+.git
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+agent*_data.json
+*.log
+invoices/
+docs/*.pdf
+docs/*.png

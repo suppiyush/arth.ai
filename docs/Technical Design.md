@@ -62,7 +62,7 @@ arth/
 ├── suppliers/                # shree_traders.yaml, gupta_cement.yaml, balaji_build.yaml
 ├── bridge/whatsapp.py        # P2: FastAPI + Twilio webhook
 ├── db/schema.sql
-├── db/seed.sql               # demo shop: 12 items, 6 parties, 30 days of history
+├── db/seed.sql               # demo shop: 12 items, 15 parties, 30 days of history
 ├── templates/invoice.html
 ├── tests/                    # unit tests + demo_replay.py
 ├── Procfile
@@ -366,7 +366,7 @@ SEED_ORCHESTRATOR=...      # one unique seed per agent; never commit
 SEED_LEDGER=...  SEED_INVENTORY=...  SEED_BILLING=...
 SEED_COLLECTIONS=...  SEED_PROCUREMENT=...  SEED_INSIGHTS=...
 SEED_SUPPLIER_SHREE=...  SEED_SUPPLIER_GUPTA=...  SEED_SUPPLIER_BALAJI=...
-SUPABASE_URL=  SUPABASE_KEY=          # P1 invoice PDFs
+CLOUDINARY_URL=                       # invoice PDFs: cloudinary://key:secret@cloud
 SARVAM_API_KEY=  TWILIO_SID=  TWILIO_TOKEN=   # P2
 ```
 

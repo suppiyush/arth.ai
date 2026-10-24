@@ -13,9 +13,19 @@ def section(reply):
     return card(reply)["card_payload"]["root"]
 
 
+def list_items(root):
+    return next(c for c in root["children"] if c.get("type") == "list")["items"]
+
+
 def body_rows(reply):
-    groups = [g for g in section(reply)["children"] if g.get("type") == "group"][1:]
-    return [[el.get("value") or el.get("label") for el in g["children"]] for g in groups]
+    """Each row of a table card as [bold line, muted line] plus its button's label, if it has one."""
+    rows = []
+    for item in list_items(section(reply)):
+        head = item["children"][0]
+        heads = head["children"] if head["type"] == "group" else [head]
+        rows.append([heads[0]["value"], *(el["value"] for el in item["children"][1:]),
+                     *(el["label"] for el in heads[1:])])
+    return rows
 
 
 def cash(conn):
@@ -31,7 +41,7 @@ def test_stock_table_puts_low_items_first(seeded_db, io, extracted):
     reply = say("stock dikhao", io)[-1]
     assert section(reply)["subtitle"] == "1 item kam hain: Cement"
     rows = body_rows(reply)
-    assert len(rows) == 12 and rows[0] == ["⚠ Cement", "12 bag", "20"]
+    assert len(rows) == 12 and rows[0] == ["⚠ Cement", "12 bag bacha · reorder level 20"]
     assert card(reply)["is_terminal"] == "true"
 
 
@@ -46,15 +56,16 @@ def test_customer_statement(seeded_db, io, extracted):
     extracted["result"] = Extraction(intent="statement", party="Ramesh Kumar")
     reply = say("Ramesh ka khata dikhao", io)[-1]
     s = section(reply)
-    assert s["title"] == "Khata: Ramesh Kumar" and s["subtitle"] == "Ramesh Kumar ka baaki: ₹5,400"
+    assert s["title"] == "Khata: Ramesh Kumar" and s["subtitle"] == "Ramesh Kumar ka baaki: ₹5,400 · Phone +91 98290 12345"
     rows = body_rows(reply)
-    assert [r[1:] for r in rows] == [["Received (UPI)", "−₹3,000"], ["Sale: 20 bags cement", "+₹8,400"]]
+    assert [r[0] for r in rows] == ["Mila (UPI)", "Bikri: 20 bags cement"]
+    assert rows[0][1].startswith("−₹3,000 · ") and rows[1][1].startswith("+₹8,400 · ")       # amount · date
     assert s["children"][-1]["action"]["selection"]["action"] == "remind"
 
 
 def test_supplier_statement_and_missing_party(seeded_db, io, extracted):
     extracted["result"] = Extraction(intent="statement", party="Shree Traders")
-    assert section(say("Shree ka hisaab", io)[-1])["subtitle"] == "Aapko Shree Traders ko dena hai: ₹22,000"
+    assert section(say("Shree ka hisaab", io)[-1])["subtitle"] == "Aapko Shree Traders ko dena hai: ₹22,000 · Phone +91 94140 11111"
     extracted["result"] = Extraction(intent="statement", missing=["party"])
     assert "Kiske naam" in texts(say("khata dikhao", io))[-1]
 
@@ -68,9 +79,9 @@ def test_daybook_today_and_cash_in_hand(seeded_db, io, extracted):
     say("confirm", io)
     extracted["result"] = Extraction(intent="daybook", period="today")
     reply = say("aaj ka hisaab", io)[-1]
-    assert body_rows(reply) == [["Sale (cash): 10 cft Sand", "Walk-in", "₹550"]]
+    assert body_rows(reply) == [["Bikri (cash): 10 cft Sand", "₹550 · Walk-in"]]
     assert cash(seeded_db) == before + 55000
-    assert section(reply)["subtitle"].startswith("Sale ₹550 · Aaya ₹0 · Kharcha ₹0 · Galle mein cash ")
+    assert section(reply)["subtitle"].startswith("Bikri ₹550 · Aaya ₹0 · Kharcha ₹0 · Galle mein cash ")
 
 
 def test_daybook_yesterday_has_seed_sales(seeded_db, io, extracted):
@@ -97,16 +108,16 @@ def test_undo_sale_reverses_everything(seeded_db, io, extracted):
     extracted["result"] = Extraction(intent="undo")
     ask = say("galti ho gayi, hata do", io)[-1]
     p = card(ask)["card_payload"]
-    assert p["title"] == "Undo: Sale to Ramesh Kumar?" and p["approve_cta"]["label"] == "Undo"
+    assert p["title"] == "Undo: Ramesh Kumar ko bikri?" and p["approve_cta"]["label"] == "Undo"
     assert balance(seeded_db, "Ramesh Kumar") == 750000                 # nothing changes before confirm
 
     done = texts(confirm_last_card(io, ask))[-1]
-    assert done.startswith("↩ Undo ho gaya: Sale to Ramesh Kumar.")
-    assert "Ramesh Kumar ka baaki ab ₹5,400." in done and "Stock wapas: Cement 12 bag." in done
+    assert done.startswith("↩ Undo ho gaya: Ramesh Kumar ko bikri.")
+    assert "Ab Ramesh Kumar ka baaki: ₹5,400." in done and "Stock wapas: Cement 12 bag." in done
     assert balance(seeded_db, "Ramesh Kumar") == 540000 and stock(seeded_db, "Cement") == 12
     assert seeded_db.execute("select count(*) as n from reminder").fetchone()["n"] == 0
     assert seeded_db.execute("select count(*) as n from action where status = 'undone'").fetchone()["n"] == 1
-    assert "nothing to undo" in texts(say("undo", io))[-1]
+    assert texts(say("undo", io))[-1] == "Undo karne ke liye kuch nahi hai."
 
 
 def test_undo_bill_cancels_invoice_and_keeps_number(seeded_db, io, extracted):
@@ -115,7 +126,7 @@ def test_undo_bill_cancels_invoice_and_keeps_number(seeded_db, io, extracted):
     say("confirm", io)
     extracted["result"] = Extraction(intent="undo")
     done = texts(confirm_last_card(io, say("undo", io)[-1]))[-1]
-    assert f"Bill {fy_number(1)} cancel ho gaya." in done
+    assert f"Bill {fy_number(1)} cancelled." in done                     # "bill verma", "undo": no Hindi words
     assert seeded_db.execute("select status from invoice").fetchone()["status"] == "cancelled"
     assert balance(seeded_db, "Verma Constructions") == 3600000 and stock(seeded_db, "TMT Bar 12mm") == 850
     extracted["result"] = VERMA_BILL
@@ -142,7 +153,7 @@ def test_typing_undo_at_the_undo_card_confirms(seeded_db, io, extracted):
     say("confirm", io)
     extracted["result"] = Extraction(intent="undo")
     say("undo", io)
-    assert texts(say("undo", io))[-1].startswith("↩ Undo ho gaya")
+    assert texts(say("undo", io))[-1].startswith("↩ Undone")
     assert balance(seeded_db, "Ramesh Kumar") == 540000
 
 
@@ -152,7 +163,7 @@ def test_keep_it_changes_nothing(seeded_db, io, extracted):
     say("confirm", io)
     extracted["result"] = Extraction(intent="undo")
     say("undo", io)
-    assert "Kept it" in texts(say("nahi", io))[-1]
+    assert texts(say("nahi", io))[-1] == "Theek hai, entry rehne di."
     assert balance(seeded_db, "Ramesh Kumar") == 750000
 
 

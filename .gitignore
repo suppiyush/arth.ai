@@ -9,3 +9,6 @@ agent*_data.json
 
 # local run logs
 *.log
+
+# generated invoice PDFs
+invoices/

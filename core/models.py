@@ -29,6 +29,7 @@ class Commit(Model):            # orchestrator -> specialist after Confirm
     action_id: str
     business_id: str
     effects: dict
+    lang: str = "en"                # the owner's language for the reply (core/lang.py)
 
 
 class Committed(Model):
@@ -40,6 +41,7 @@ class Committed(Model):
 
 class Undo(Model):             # orchestrator -> each specialist that committed the action
     action_id: str
+    lang: str = "en"
 
 
 class UndoDone(Model):
@@ -61,7 +63,9 @@ class QueryResult(Model):
     card_kind: str | None = None    # which card the orchestrator should render; None = text only
     card_payload: dict = {}
     terminal: bool = True           # informational card; False when it carries buttons
-    text: str
+    text: str                       # the whole answer as plain text (the card's fallback)
+    narration: str = ""             # a short answer shown above the card; empty: the card speaks for itself
+    missing: bool = False           # nothing matched (e.g. no bill yet for that sale), so the caller may offer another way
 
 
 # Procurement <-> supplier negotiation

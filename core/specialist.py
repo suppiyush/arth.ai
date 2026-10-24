@@ -2,7 +2,8 @@
 Undo -> UndoDone.
 
 Synchronous logic functions (psycopg) run in a thread; async ones (those calling ASI1) are awaited.
-A logic function with a `ctx` parameter also gets the uAgent Context (Procurement uses it to reach suppliers).
+A logic function with a `ctx` parameter also gets the uAgent Context (Procurement uses it to reach suppliers),
+and commit/undo functions with a `lang` parameter get the owner's language for their reply.
 Only the orchestrator may call a specialist; anything else is dropped. A crash becomes ok=False,
 never silence.
 """
@@ -17,8 +18,11 @@ from core import net
 from core.models import Commit, Committed, Plan, PlanResult, Query, QueryResult, Undo, UndoDone
 
 
-async def call(fn: Callable, *args, ctx: Context | None = None):
-    kwargs = {"ctx": ctx} if ctx is not None and "ctx" in inspect.signature(fn).parameters else {}
+async def call(fn: Callable, *args, ctx: Context | None = None, lang: str | None = None):
+    params = inspect.signature(fn).parameters
+    kwargs = {"ctx": ctx} if ctx is not None and "ctx" in params else {}
+    if lang is not None and "lang" in params:
+        kwargs["lang"] = lang
     if inspect.iscoroutinefunction(fn):
         return await fn(*args, **kwargs)
     return await asyncio.to_thread(fn, *args, **kwargs)
@@ -53,7 +57,8 @@ def serve(agent: Agent, name: str, plan: Callable | None = None, commit: Callabl
             if not allowed(ctx, sender):
                 return
             try:
-                res = await call(commit, msg.request_id, msg.action_id, msg.business_id, msg.effects, ctx=ctx)
+                res = await call(commit, msg.request_id, msg.action_id, msg.business_id, msg.effects, ctx=ctx,
+                                 lang=msg.lang)
             except Exception as err:
                 ctx.logger.exception("commit failed")
                 res = Committed(request_id=msg.request_id, ok=False, message=str(err))
@@ -77,7 +82,7 @@ def serve(agent: Agent, name: str, plan: Callable | None = None, commit: Callabl
             if not allowed(ctx, sender):
                 return
             try:
-                res = await call(undo, msg.action_id, ctx=ctx)
+                res = await call(undo, msg.action_id, ctx=ctx, lang=msg.lang)
             except Exception as err:
                 ctx.logger.exception("undo failed")
                 res = UndoDone(action_id=msg.action_id, ok=False, message=str(err))

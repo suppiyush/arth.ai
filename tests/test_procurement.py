@@ -126,7 +126,7 @@ def test_quotes_carousel_after_one_counter_round(seeded_db, io, suppliers, extra
     reply = restock(io, extracted)[-1]
     assert card(reply)["card_kind"] == "carousel"
     p = payload(reply)
-    assert p["title"] == "Quotes for 50 bag Cement"
+    assert p["title"] == "50 bag Cement ke quote"
     assert [i["title"] for i in p["items"]] == ["Gupta Cement", "Shree Traders", "Balaji Build"]
     gupta, shree, balaji = p["items"]
     assert gupta["subtitle"] == "₹377.30/bag · 3 din · ★4.6"                      # 385 countered to 2% below
@@ -147,12 +147,12 @@ def choose(io, reply, n=0):
 def test_choose_then_approve(seeded_db, io, suppliers, extracted):
     review = choose(io, restock(io, extracted)[-1])[-1]
     p = payload(review)
-    assert p["title"] == "Restock: 50 bag Cement from Gupta Cement"
+    assert p["title"] == "Restock: Gupta Cement se 50 bag Cement"
     rows = {r["label"]: r["value"] for r in p["summary_rows"]}
     assert rows["Rate"] == "₹377.30 (pehle ₹385)/bag"
     assert rows["Order total"] == "₹18,865" and rows["Arth fee (1%)"] == "₹188.65"
-    assert rows["You pay"] == "₹19,053.65 = 1.9054 FET (testnet)"
-    assert p["approve_cta"]["label"] == "Approve order"
+    assert rows["Aap denge"] == "₹19,053.65 = 1.9054 FET (testnet)"
+    assert p["approve_cta"]["label"] == "Order approve karo"
     assert po(seeded_db)["status"] == "awaiting_approval"                       # nothing agreed before approval
 
     replies = say(json.dumps(p["approve_cta"]["selection"]), io)
@@ -170,14 +170,14 @@ def test_choose_then_approve(seeded_db, io, suppliers, extracted):
 
 def test_typed_supplier_name_and_haan_choose(seeded_db, io, suppliers, extracted):
     restock(io, extracted)
-    assert payload(say("shree wala le lo", io)[-1])["title"] == "Restock: 50 bag Cement from Shree Traders"
+    assert payload(say("shree wala le lo", io)[-1])["title"] == "Restock: Shree Traders se 50 bag Cement"
     restock(io, extracted)
-    assert payload(say("haan", io)[-1])["title"].endswith("from Gupta Cement")   # best value
+    assert payload(say("haan", io)[-1])["title"].startswith("Restock: Gupta Cement se")   # best value
 
 
 def test_cancel_closes_the_order(seeded_db, io, suppliers, extracted):
     restock(io, extracted)
-    assert "order cancel" in texts(say("cancel", io))[-1]
+    assert texts(say("cancel", io))[-1] == "Theek hai, order cancel kar diya."
     assert po(seeded_db)["status"] == "cancelled"
 
 
@@ -185,7 +185,7 @@ def test_silent_and_unstocked_suppliers_are_noted(seeded_db, io, suppliers, extr
     suppliers.silent = {"Shree Traders"}
     p = payload(restock(io, extracted, amount=200)[-1])
     assert [i["title"] for i in p["items"]] == ["Gupta Cement"]
-    assert "no reply: Shree Traders" in p["subtitle"] and "don't stock it: Balaji Build" in p["subtitle"]
+    assert "jawab nahi aaya: Shree Traders" in p["subtitle"] and "inke paas nahi hai: Balaji Build" in p["subtitle"]
 
 
 def test_no_quotes_at_all(seeded_db, io, suppliers, extracted):
@@ -198,7 +198,7 @@ def test_missing_quantity_is_suggested(seeded_db, io, suppliers, extracted):
     extracted["result"] = Extraction(intent="restock", lines=[Line(item="Cement")])
     reply = say("cement mangwa do", io)
     assert "28 bag maan liya" in texts(reply)[-1]                               # 2 x reorder 20 - stock 12
-    assert payload(reply[-1])["title"] == "Quotes for 28 bag Cement"
+    assert payload(reply[-1])["title"] == "28 bag Cement ke quote"
 
 
 def test_unknown_item_asks(seeded_db, io, suppliers, extracted):
@@ -212,7 +212,7 @@ def test_undo_cancels_unpaid_order(seeded_db, io, suppliers, extracted):
     say("confirm", io)
     extracted["result"] = Extraction(intent="undo")
     p = payload(say("undo", io)[-1])
-    assert p["title"] == "Undo: Restock: 50 bag Cement from Gupta Cement?"
+    assert p["title"] == "Undo: Restock: Gupta Cement se 50 bag Cement?"
     done = texts(say("confirm", io))[-1]
     assert "Supplier order cancel ho gaya." in done
     assert po(seeded_db)["status"] == "cancelled"
@@ -248,7 +248,7 @@ def test_paid_restock_is_ordered_paid_and_posted(seeded_db, io, suppliers, extra
     said = outbox_texts(out)
     assert said[0].startswith("✅ Payment mil gaya: 1.9054 FET")
     assert said[-1].startswith("📦 Order confirmed: 50 bag Cement from Gupta Cement @ ₹377.30 = ₹18,865.")
-    assert "Delivery: " in said[-1] and "Khata updated." in said[-1]
+    assert "Delivery: " in said[-1] and "Khata update ho gaya." in said[-1]
 
     # leg 2: Procurement paid Gupta exactly the agreed total, once
     assert ledger.transfers == [("procurement", "fetch1supplier_gupta", 1886500000000000000)]
@@ -328,7 +328,7 @@ def test_rejected_payment_cancels_the_order(seeded_db, io, suppliers, extracted,
     assert "order bhi cancel" in outbox_texts(io.outbox)[0]
     assert po(seeded_db)["status"] == "cancelled" and ledger.transfers == []
     extracted["result"] = Extraction(intent="undo")
-    assert "nothing to undo" in texts(say("undo", io))[-1]
+    assert texts(say("undo", io))[-1] == "Undo karne ke liye kuch nahi hai."
 
 
 def test_supplier_refuses_order_at_a_lower_price_and_unpaid_commit():

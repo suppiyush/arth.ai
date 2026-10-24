@@ -15,12 +15,29 @@ def test_seed_balances(seeded):
         "Shree Traders": -2200000,
         "Gupta Cement": 0,
         "Balaji Build": 0,
+        "Kailash Builders": 1700000,
+        "Meena Interiors": 760000,
+        "Deepak Yadav": 330000,
+        "Arif Electricals": 350000,
+        "Gopal Singh": 0,
+        "Arora Homes": -500000,          # advance
+        "Jaipur Paints & Hardware": -1380000,
+        "Rajasthan Sand Suppliers": -900000,
+        "Mahaveer Hardware": -680000,
     }
+
+
+def test_shop_today_ignores_server_timezone(seeded):
+    """Entries are dated in India whatever the server's timezone; UTC+14 and UTC-11 are never both on IST's date."""
+    from core import clock
+    for tz in ("Pacific/Kiritimati", "Pacific/Pago_Pago"):
+        seeded.execute(f"set timezone to '{tz}'")
+        assert seeded.execute("select shop_today() as d").fetchone()["d"] == clock.today(), tz
 
 
 def test_seed_shape(seeded):
     counts = {t: seeded.execute(f"select count(*) as n from {t}").fetchone()["n"] for t in ("item", "party")}
-    assert counts == {"item": 12, "party": 6}
+    assert counts == {"item": 12, "party": 15}
     days = seeded.execute(
         "select count(distinct txn_date) as n from txn where kind = 'sale' and party_id is null").fetchone()["n"]
     assert days == 30

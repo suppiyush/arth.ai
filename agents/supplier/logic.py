@@ -8,7 +8,7 @@ Orders live in the agent's storage under po:<po_id>, keyed to the buyer who aske
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -16,7 +16,7 @@ import yaml
 from uagents_core.contrib.protocols.payment import (CancelPayment, CommitPayment, CompletePayment, Funds,
                                                     RequestPayment)
 
-from core import chain
+from core import chain, clock
 from core.fuzzy import best_match
 from core.models import RFQ, Counter, OrderConfirmed, PlaceOrder, Quote
 from core.money import paise_to_atestfet, to_paise
@@ -117,5 +117,5 @@ def on_commit_payment(s: Supplier, storage, buyer: str, msg: CommitPayment, wall
 
 
 def _confirmed(s: Supplier, po_id: str) -> OrderConfirmed:
-    return OrderConfirmed(po_id=po_id, dispatch_eta=(date.today() + timedelta(days=s.delivery_days)).isoformat())
+    return OrderConfirmed(po_id=po_id, dispatch_eta=(clock.today() + timedelta(days=s.delivery_days)).isoformat())
 

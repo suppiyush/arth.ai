@@ -1,10 +1,14 @@
--- Demo shop: a building-materials store in Jaipur with 12 items, 6 parties and 30 days of history.
--- Run on a freshly created schema (python -m core.db reset). Dates are relative to current_date,
+-- Demo shop: a building-materials store in Jaipur with 12 items, 15 parties and 30 days of history.
+-- Run on a freshly created schema (python -m core.db reset). Dates are relative to shop_today(),
 -- and every id is derived from a fixed key, so each run produces the same rows.
 --
 -- Resulting balances (positive = they owe us):
---   Ramesh Kumar ₹5,400 · Sunita Devi ₹2,100 · Verma Constructions ₹36,000
---   Shree Traders -₹22,000 (we owe) · Gupta Cement 0 · Balaji Build 0
+--   Verma Constructions ₹36,000 · Kailash Builders ₹17,000 · Meena Interiors ₹7,600 · Ramesh Kumar ₹5,400
+--   Arif Electricals ₹3,500 · Deepak Yadav ₹3,300 · Sunita Devi ₹2,100 · Gopal Singh 0 (paid up)
+--   Arora Homes -₹5,000 (advance paid to us)
+--   We owe: Shree Traders ₹22,000 · Jaipur Paints & Hardware ₹13,800 · Rajasthan Sand Suppliers ₹9,000
+--   · Mahaveer Hardware ₹6,800 · Gupta Cement 0 · Balaji Build 0
+-- The extra parties only use credit, UPI and bank, so cash in hand is the same as with the six original ones.
 -- Cement ends at 12 bags against a reorder level of 20, ready for the restock demo.
 
 insert into business (id, owner_address, name, gstin, state_code, upi_vpa)
@@ -40,7 +44,16 @@ from (values
   ('customer', 'Verma Constructions', '919812067890', '06'),   -- Haryana: IGST on bills
   ('supplier', 'Shree Traders',       '919414011111', '08'),
   ('supplier', 'Gupta Cement',        '919414022222', '08'),
-  ('supplier', 'Balaji Build',        '919414033333', '08')
+  ('supplier', 'Balaji Build',        '919414033333', '08'),
+  ('customer', 'Kailash Builders',    '919829045678', '08'),
+  ('customer', 'Meena Interiors',     '919829056789', '08'),
+  ('customer', 'Deepak Yadav',        '919829067890', '08'),
+  ('customer', 'Arif Electricals',    '919829078901', '08'),
+  ('customer', 'Gopal Singh',         '919829089012', '08'),
+  ('customer', 'Arora Homes',         '919829090123', '08'),
+  ('supplier', 'Jaipur Paints & Hardware', '919414044444', '08'),
+  ('supplier', 'Rajasthan Sand Suppliers', '919414055555', '08'),
+  ('supplier', 'Mahaveer Hardware',   '919414066666', '08')
 ) v(kind, name, phone, state);
 
 -- Named-party entries and expenses. One akey = one action; rows sharing an akey were one confirmation.
@@ -56,6 +69,16 @@ insert into seed_entry values
   ('verma-sale-1',    26, 'Verma Constructions', 'receipt', 1500000, 'bank',   null, null),
   ('verma-sale-2',    12, 'Verma Constructions', 'sale',    2700000, 'credit', null, '3000 bricks'),
   ('verma-rcpt',       5, 'Verma Constructions', 'receipt', 1000000, 'bank',   null, null),
+  ('kailash-sale',    28, 'Kailash Builders',    'sale',    2300000, 'credit', null, '1000 bricks, 200 kg TMT 8mm'),
+  ('kailash-rcpt',    12, 'Kailash Builders',    'receipt',  600000, 'bank',   null, null),
+  ('meena-sale',      19, 'Meena Interiors',     'sale',     960000, 'credit', null, '10 boxes tiles, 4 bags wall putty'),
+  ('meena-sale',      19, 'Meena Interiors',     'receipt',  200000, 'upi',    null, null),
+  ('gopal-sale',       9, 'Gopal Singh',         'sale',     232000, 'credit', null, '8 PVC pipes'),
+  ('gopal-rcpt',       6, 'Gopal Singh',         'receipt',  232000, 'upi',    null, null),
+  ('deepak-sale',      4, 'Deepak Yadav',        'sale',     630000, 'credit', null, '15 bags cement'),
+  ('deepak-sale',      4, 'Deepak Yadav',        'receipt',  300000, 'upi',    null, null),
+  ('arora-advance',    3, 'Arora Homes',         'receipt',  500000, 'bank',   null, 'advance for tiles order'),
+  ('arif-sale',        2, 'Arif Electricals',    'sale',     350000, 'credit', null, '2 coils electric wire'),
   -- suppliers
   ('gupta-purchase',  20, 'Gupta Cement',        'purchase', 1900000, 'credit', null, '50 bags cement'),
   ('gupta-pay',       18, 'Gupta Cement',        'payment',  1900000, 'bank',   null, null),
@@ -63,6 +86,10 @@ insert into seed_entry values
   ('shree-purchase',  14, 'Shree Traders',       'payment',  4000000, 'bank',   null, null),
   ('balaji-purchase',  7, 'Balaji Build',        'purchase', 2520000, 'credit', null, '30 boxes tiles, 40 PVC pipes'),
   ('balaji-purchase',  7, 'Balaji Build',        'payment',  2520000, 'upi',    null, null),
+  ('jph-purchase',    16, 'Jaipur Paints & Hardware', 'purchase', 2880000, 'credit', null, '6 buckets white paint, 4 coils wire'),
+  ('jph-purchase',    16, 'Jaipur Paints & Hardware', 'payment',  1500000, 'bank',   null, null),
+  ('rss-purchase',    10, 'Rajasthan Sand Suppliers', 'purchase',  900000, 'credit', null, '200 cft sand'),
+  ('mahaveer-purchase', 5, 'Mahaveer Hardware',  'purchase',  680000, 'credit', null, '40 kg nails, 40 kg binding wire'),
   -- expenses
   ('exp-rent',        20, null, 'expense', 1500000, 'bank', 'rent',        'shop rent'),
   ('exp-electricity', 10, null, 'expense',  320000, 'upi',  'electricity', null),
@@ -82,7 +109,19 @@ insert into seed_move values
   ('gupta-purchase',  'Cement',             50),
   ('shree-purchase',  'TMT Bar 12mm',     1000),
   ('balaji-purchase', 'Floor Tiles 2x2',    30),
-  ('balaji-purchase', 'PVC Pipe 1 inch',    40);
+  ('balaji-purchase', 'PVC Pipe 1 inch',    40),
+  ('kailash-sale',    'Bricks',          -1000),
+  ('kailash-sale',    'TMT Bar 8mm',      -200),
+  ('meena-sale',      'Floor Tiles 2x2',   -10),
+  ('meena-sale',      'Wall Putty 40kg',    -4),
+  ('gopal-sale',      'PVC Pipe 1 inch',    -8),
+  ('deepak-sale',     'Cement',            -15),
+  ('arif-sale',       'Electric Wire 1.5mm', -2),
+  ('jph-purchase',    'White Paint 20L',     6),
+  ('jph-purchase',    'Electric Wire 1.5mm', 4),
+  ('rss-purchase',    'Sand',              200),
+  ('mahaveer-purchase', 'Nails',            40),
+  ('mahaveer-purchase', 'Binding Wire',     40);
 
 -- Walk-in counter sales: 2 to 4 a day, one item each, paid on the spot.
 create temp table seed_walkin as
@@ -98,23 +137,23 @@ insert into action (id, business_id, kind, payload, created_at)
 select md5('arth-seed-' || akey)::uuid, '00000000-0000-4000-8000-000000000001',
        case when bool_or(kind = 'sale') then 'sale' when bool_or(kind = 'purchase') then 'purchase'
             else min(kind) end,
-       '{"seed": true}', current_date - max(days_ago) + time '11:00'
+       '{"seed": true}', shop_today() - max(days_ago) + time '11:00'
 from seed_entry group by akey;
 
 insert into action (id, business_id, kind, payload, created_at)
 select action_id, '00000000-0000-4000-8000-000000000001', 'sale', '{"seed": true}',
-       current_date - days_ago + time '09:00' + k * interval '2 hours'
+       shop_today() - days_ago + time '09:00' + k * interval '2 hours'
 from seed_walkin;
 
 insert into txn (business_id, action_id, party_id, kind, amount_paise, mode, category, note, txn_date)
 select '00000000-0000-4000-8000-000000000001', md5('arth-seed-' || e.akey)::uuid, p.id,
-       e.kind, e.amount_paise, e.mode, e.category, e.note, current_date - e.days_ago
+       e.kind, e.amount_paise, e.mode, e.category, e.note, shop_today() - e.days_ago
 from seed_entry e
 left join party p on p.name = e.party and p.business_id = '00000000-0000-4000-8000-000000000001';
 
 insert into txn (business_id, action_id, kind, amount_paise, mode, note, txn_date)
 select '00000000-0000-4000-8000-000000000001', action_id, 'sale', (qty * price_paise)::bigint,
-       mode, qty || ' ' || item, current_date - days_ago
+       mode, qty || ' ' || item, shop_today() - days_ago
 from seed_walkin;
 
 insert into stock_move (action_id, item_id, qty, reason)
@@ -129,7 +168,7 @@ from seed_walkin;
 -- Opening stock is whatever makes the move history add up to today's stock_qty.
 insert into action (id, business_id, kind, payload, created_at)
 values (md5('arth-seed-opening')::uuid, '00000000-0000-4000-8000-000000000001', 'opening_stock',
-        '{"seed": true}', current_date - 31 + time '09:00');
+        '{"seed": true}', shop_today() - 31 + time '09:00');
 
 insert into stock_move (action_id, item_id, qty, reason)
 select md5('arth-seed-opening')::uuid, i.id, i.stock_qty - coalesce(sum(m.qty), 0), 'opening'

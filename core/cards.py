@@ -1,17 +1,21 @@
 """ASI:One Interactive Cards (card_protocol_version 1).
 
-Every builder returns a Card holding the payload and a plain-text fallback. The fallback goes into
-the message's TextContent, because ASI:One silently shows an invalid card as text, and the WhatsApp
-bridge flattens cards the same way. Every CTA selection carries {"action": ..., "request_id": ...}.
+Every builder returns a Card holding the payload and a plain-text fallback. A card that fails validation
+is sent as its fallback text alone. A valid card goes with one line of text (its narration, or its
+title), so ASI:One doesn't show the same content twice; CARD_TEXT=full sends the whole fallback as well,
+for chat clients that don't draw cards. Every CTA selection carries {"action": ..., "request_id": ...}.
 """
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from uagents_core.contrib.protocols.chat import ChatMessage, MetadataContent, TextContent
+
+from core import config
 
 MAX_PAYLOAD_BYTES = 64 * 1024
 MAX_DEPTH = 8
@@ -163,16 +167,23 @@ def custom(root: dict, fallback: str, terminal: bool = False) -> Card:
 
 
 def table(title: str, headers: list[str], rows: list[list[str]], subtitle: str | None = None,
-          row_buttons: list[dict | None] | None = None, footer: list[dict] | None = None) -> Card:
-    """A table as rows of groups. row_buttons[i], if set, is a button element appended to row i."""
-    header = group([text(h, "emphasis") for h in headers], "row")
-    body = []
+          row_buttons: list[dict | None] | None = None, footer: list[dict] | None = None,
+          detail: Callable[[list[str]], str] | None = None) -> Card:
+    """Rows as a list, because cards have no grid (a row of text pieces can't line up into columns):
+    each row's first cell in bold, with row_buttons[i] beside it if set, and the other cells on a muted
+    line below. detail(row) words that line; by default "Header: value · Header: value". The plain-text
+    fallback keeps the columns."""
+    def default(r: list[str]) -> str:
+        return " · ".join(f"{h}: {v}" if h else v for h, v in zip(headers[1:], r[1:]) if v not in ("", "—"))
+
+    items = []
     for i, r in enumerate(rows):
-        cells = [text(c) for c in r]
+        head = text(r[0], "emphasis")
         if row_buttons and row_buttons[i]:
-            cells.append(row_buttons[i])
-        body.append(group(cells, "row"))
-    children = [header, divider(), *body, *(footer or [])]
+            head = group([head, row_buttons[i]], "row", gap=8)
+        line = (detail or default)(r)
+        items.append({"children": [head, text(line, "muted")] if line else [head]})
+    children = [{"type": "list", "items": items}, *(footer or [])]
     fallback = "\n".join([title, *([subtitle] if subtitle else []), " | ".join(headers),
                           *(" | ".join(r) for r in rows)])
     has_input = bool(footer) or any(row_buttons or [])
@@ -206,12 +217,13 @@ def text_message(body: str) -> ChatMessage:
 
 
 def card_message(card: Card, narration: str = "", drawer_width_px: int | None = None) -> ChatMessage:
-    """Narration + fallback as TextContent, then the card. An invalid card degrades to text only."""
-    body = f"{narration}\n\n{card.fallback}" if narration else card.fallback
+    """A line of text, then the card. An invalid card degrades to its whole fallback as text."""
+    full = f"{narration}\n\n{card.fallback}" if narration else card.fallback
     try:
         payload = validate(card)
     except ValueError:
-        return text_message(body)
+        return text_message(full)
+    body = full if config.CARD_TEXT == "full" else narration or card.fallback.split("\n", 1)[0]
     metadata = {
         "card_protocol_version": "1",
         "requires_card_interaction": "true",
