@@ -546,14 +546,15 @@ def test_what_the_shop_owes_suppliers(seeded_db, io, extracted):
     assert "Verma" not in json.dumps(section)
 
 
-def test_remind_button_to_whatsapp_link(seeded_db, io, extracted):
+def test_remind_button_to_whatsapp_link(seeded_db, io, extracted, monkeypatch):
+    monkeypatch.setattr(collections.storage, "save_image", lambda data, folder, name: f"https://img/{name}.png")
     extracted["result"] = Extraction(intent="dues")
     section = card(say("udhaar list", io)[-1])["card_payload"]["root"]
     ramesh_sel = list_items(section)[3]["children"][0]["children"][1]["action"]["selection"]
     draft = card(say(json.dumps(ramesh_sel), io)[-1])
     p = draft["card_payload"]
     assert draft["card_kind"] == "detail" and p["title"] == "Ramesh Kumar ko reminder"
-    assert p["hero_image"].startswith("data:image/png;base64,")
+    assert p["hero_image"].startswith("https://img/upi-qr-")          # a web link: ASI:One drops data: URIs
     rows = {r["label"]: r["value"] for r in p["summary_rows"]}
     assert rows["Baaki"] == "₹5,400"
     assert "₹5,400" in rows["Message"] and "upi://pay?pa=sharmabuilding%40upi" in rows["Message"]

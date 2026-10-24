@@ -9,8 +9,8 @@
 """
 
 import asyncio
-import base64
 import io
+import logging
 import re
 from datetime import timedelta
 from urllib.parse import quote, urlencode
@@ -18,7 +18,7 @@ from uuid import UUID
 
 import qrcode
 
-from core import cards, clock, db, llm, lookup
+from core import cards, clock, db, llm, lookup, storage
 from core.lang import DEFAULT, of, pick, plural
 from core.models import Committed, PlanResult, QueryResult, UndoDone
 from core.money import inr, to_rupees
@@ -142,11 +142,24 @@ def upi_link(vpa: str, shop: str, amount_paise: int, note: str) -> str:
     return "upi://pay?" + urlencode(params, quote_via=quote)
 
 
-def qr_data_uri(data: str) -> str:
-    img = qrcode.make(data, box_size=4, border=2)
+log = logging.getLogger("arth.collections")
+
+
+def qr_png(data: str) -> bytes:
+    img = qrcode.make(data, box_size=6, border=2)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    return buf.getvalue()
+
+
+def qr_url(link: str, business_id: str, party_id) -> str | None:
+    """The UPI QR code as a web link for the reminder card. None when Cloudinary isn't set up or the upload
+    fails: the card then goes without the picture, and the UPI link is still in the message."""
+    try:
+        return storage.save_image(qr_png(link), business_id, f"upi-qr-{party_id}")
+    except Exception as err:
+        log.warning(f"UPI QR upload failed: {type(err).__name__}: {err}")
+        return None
 
 
 def wa_link(phone: str | None, message: str) -> str:
@@ -221,7 +234,7 @@ async def plan(request_id: str, business_id: str, intent: str, fields: dict) -> 
     return PlanResult(request_id=request_id, ok=True, summary_rows=rows, effects={
         "title": pick(lang, f"{party['name']} ko reminder", f"Reminder for {party['name']}"), "party_id": str(party["id"]), "party": party["name"],
         "amount_paise": due, "message": message, "upi_link": link, "wa_link": wa_link(party["phone"], message),
-        "qr": qr_data_uri(link) if link else None})
+        "qr": await asyncio.to_thread(qr_url, link, business_id, party["id"]) if link else None})
 
 
 # Commits

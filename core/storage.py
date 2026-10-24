@@ -6,6 +6,7 @@ block public delivery of PDFs (401) unless a security setting is changed, and th
 way. It carries a signature, never the API secret, and stays valid for LINK_YEARS.
 """
 
+import io
 import re
 import time
 from dataclasses import dataclass
@@ -52,3 +53,15 @@ def save_pdf(data: bytes, folder: str, name: str) -> Stored:
     link = cloudinary.utils.private_download_url(public_id, "pdf", resource_type="image", type="upload",
                                                  expires_at=int(time.time()) + LINK_YEARS * 365 * 24 * 3600)
     return Stored(str(path), link)
+
+
+def save_image(data: bytes, folder: str, name: str) -> str | None:
+    """Upload a PNG and return its public https link, or None without Cloudinary. ASI:One cards load
+    images from web links only (an embedded data: URI makes it drop the whole card); unlike PDFs, images
+    are delivered publicly on Cloudinary's free plan."""
+    if not config.CLOUDINARY_URL:
+        return None
+    cloudinary = _cloudinary()
+    res = cloudinary.uploader.upload(io.BytesIO(data), public_id=f"arth/{safe_name(folder)}/{safe_name(name)}",
+                                     resource_type="image", format="png", overwrite=True, invalidate=True)
+    return res["secure_url"]

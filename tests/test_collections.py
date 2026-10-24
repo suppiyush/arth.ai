@@ -14,9 +14,14 @@ def test_wa_link_keeps_digits_only():
     assert logic.wa_link(None, "x") == "https://wa.me/?text=x"
 
 
-def test_qr_is_small_png():
-    uri = logic.qr_data_uri("upi://pay?pa=a@b&am=1.00")
-    assert uri.startswith("data:image/png;base64,") and len(uri) < 4000
+def test_qr_is_small_png_and_goes_out_as_a_link(monkeypatch):
+    png = logic.qr_png("upi://pay?pa=a@b&am=1.00")
+    assert png.startswith(b"\x89PNG") and len(png) < 4000
+    assert logic.qr_url("upi://pay?pa=a@b", "biz", "p1") is None           # no Cloudinary: no picture
+    monkeypatch.setattr(logic.storage, "save_image", lambda data, folder, name: f"https://img/{folder}/{name}.png")
+    assert logic.qr_url("upi://pay?pa=a@b", "biz", "p1") == "https://img/biz/upi-qr-p1.png"
+    monkeypatch.setattr(logic.storage, "save_image", lambda *a: (_ for _ in ()).throw(OSError("offline")))
+    assert logic.qr_url("upi://pay?pa=a@b", "biz", "p1") is None           # upload failure never blocks the card
 
 
 def fake_explain(reply):
