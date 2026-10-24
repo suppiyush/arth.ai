@@ -112,8 +112,12 @@ if __name__ == "__main__":
         print("schema and seed applied")
         check(config.DATABASE_URL)
     elif command == "init":
-        print("database created with the demo shop" if init(config.require("DATABASE_URL"))
-              else "database already set up; nothing changed")
+        created = init(config.require("DATABASE_URL"))
+        with psycopg.connect(config.DATABASE_URL) as conn:
+            shops, parties, entries = conn.execute("select (select count(*) from business), (select count(*) from party), "
+                                                   "(select count(*) from txn)").fetchone()
+        print(f"database {'created with the demo shop' if created else 'already set up; nothing changed'}: "
+              f"{shops} shop(s), {parties} parties, {entries} entries")
     elif command == "check":
         check(config.require("DATABASE_URL"))
     else:
